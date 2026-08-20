@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strategic Planning &amp; Analysis — Control Tower</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0f14; --bg2:#0e141b; --panel:#121820; --panel2:#161d27; --border:#243041;
+    --txt:#e6ebf2; --muted:#7d8a9c; --blue:#4a8fd4; --blue2:#6cb2f0;
+    --green:#34d399; --amber:#fbbf24; --red:#f87171; --gray:#5b6675;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:13.5px;line-height:1.5}
+  a{color:var(--blue2);text-decoration:none}
+  .wrap{max-width:1500px;margin:0 auto;padding:18px 22px 80px}
+
+  header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;padding:6px 0 16px;border-bottom:1px solid var(--border)}
+  header .brand{display:flex;align-items:center;gap:12px}
+  .mark{width:40px;height:40px;border-radius:9px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;font-weight:800;color:#06121f;letter-spacing:.5px;font-size:15px}
+  header h1{font-size:20px;font-weight:700;letter-spacing:.2px}
+  header h1 span{color:var(--blue2)}
+  .sub{color:var(--muted);font-size:12px;margin-top:3px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .badge{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--panel);color:var(--muted)}
+  .badge.live{color:var(--green);border-color:rgba(52,211,153,.35)}
+  .badge.live .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .prole{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;padding:2px 9px;border-radius:12px;font-weight:700}
+  .prole.admin{background:rgba(248,113,113,.15);color:var(--red)}
+  .prole.management{background:rgba(251,191,36,.15);color:var(--amber)}
+  .prole.team{background:rgba(52,211,153,.15);color:var(--green)}
+
+  nav.tabs{display:flex;flex-wrap:wrap;gap:4px;margin:18px 0 6px;border-bottom:1px solid var(--border)}
+  nav.tabs button{background:transparent;border:none;color:var(--muted);padding:11px 16px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.2px;font-family:inherit}
+  nav.tabs button:hover{color:var(--txt)}
+  nav.tabs button.on{color:var(--blue2);border-bottom-color:var(--blue2)}
+  .tab-pane{display:none;padding-top:20px}
+  .tab-pane.active{display:block}
+
+  .sec{margin-bottom:22px}
+  h2.sec-title{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px;font-weight:700}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .card h3{font-size:13.5px;font-weight:700;margin-bottom:10px}
+  .grid{display:grid;gap:14px}
+  .grid.c2{grid-template-columns:1fr 1fr}
+  .grid.c3{grid-template-columns:repeat(3,1fr)}
+  .grid.c4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:960px){.grid.c2,.grid.c3,.grid.c4{grid-template-columns:1fr}}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;margin-bottom:20px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;border-left:3px solid var(--blue)}
+  .kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .kpi .n{font-size:22px;font-weight:700;margin:6px 0 2px;letter-spacing:-.3px}
+  .kpi .u{font-size:11px;color:var(--muted)}
+  .kpi.g{border-left-color:var(--green)}
+  .kpi.a{border-left-color:var(--amber)}
+  .kpi.r{border-left-color:var(--red)}
+  .pos{color:var(--green)} .warn{color:var(--amber)} .neg{color:var(--red)} .mut{color:var(--muted)}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:9px 10px;border-bottom:1px solid rgba(36,48,65,.55);vertical-align:middle}
+  tr:hover td{background:rgba(76,143,212,.05)}
+  th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:10px;font-weight:700}
+  .pill.g{background:rgba(52,211,153,.14);color:var(--green)}
+  .pill.a{background:rgba(251,191,36,.14);color:var(--amber)}
+  .pill.r{background:rgba(248,113,113,.16);color:var(--red)}
+  .pill.x{background:rgba(91,102,117,.2);color:var(--gray)}
+  .srh{overflow-x:auto}
+  th.sort{cursor:pointer;user-select:none}
+  th.sort:hover{color:var(--blue2)}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .tile{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;border-top:3px solid var(--gray)}
+  .tile .tname{font-weight:700;font-size:12.5px}
+  .tile .tv{font-size:17px;font-weight:700;margin:3px 0 0}
+  .tile .tm{font-size:11px;color:var(--muted)}
+  .tile .tp{font-size:11px;margin-top:4px;font-weight:600}
+  .tile.r{border-top-color:var(--red)} .tile.a{border-top-color:var(--amber)} .tile.g{border-top-color:var(--green)} .tile.x{border-top-color:var(--gray)}
+
+  .chartbox{position:relative;height:300px}
+  .chartbox.tall{height:340px}
+  .note{font-size:11.5px;color:var(--muted);line-height:1.55}
+  footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+
+  .sop{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+  .sop-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px;border-top:3px solid var(--blue)}
+  .sop-card .st{font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .sop-card .row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(36,48,65,.5)}
+  .sop-card .row:last-child{border-bottom:none}
+  .sop-card .row .k{color:var(--muted)}
+  .sop-card ul{margin:8px 0 0 16px;font-size:11.5px;color:var(--txt)}
+  .sop-card li{margin:3px 0}
+
+  .deccard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;border-left:3px solid var(--blue)}
+  .deccard .dhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .deccard .dsbu{font-weight:700}
+  .deccard .dnote{font-size:12px;color:var(--muted);margin:6px 0}
+  .deccard .ddec{font-size:12.5px}
+  .ddec b{color:var(--blue2)}
+
+  /* executive profile */
+  .profile{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .avatar{width:68px;height:68px;border-radius:16px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#06121f;font-weight:800;font-size:24px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .profile .pname{font-size:18px;font-weight:700}
+  .profile .pdes{color:var(--blue2);font-weight:600;font-size:13px}
+  .profile .prowe{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12px;color:var(--muted)}
+  .profile .prowe b{color:var(--txt);font-weight:600}
+
+  /* progress ring */
+  .ring{width:60px;height:60px;border-radius:50%;position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .ring::after{content:'';position:absolute;inset:6px;border-radius:50%;background:var(--panel)}
+  .ring span{position:relative;z-index:1;font-weight:700;font-size:13px}
+
+  /* horizontal bar */
+  .hbar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:6px}
+  .hbar i{display:block;height:100%;border-radius:4px;background:var(--blue2)}
+
+  /* team cards */
+  .tcells{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+  .tcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+  .tcard .thead{display:flex;gap:12px;align-items:center}
+  .tcard .avatar{width:46px;height:46px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#06121f;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 auto}
+  .tcard h3{font-size:14px;font-weight:700;line-height:1.2}
+  .tcard .des{color:var(--muted);font-size:12px}
+  .tcard .trow{display:flex;justify-content:space-between;gap:10px;font-size:12px}
+  .tcard .trow .k{color:var(--muted)}
+  .tcard .proj{display:flex;flex-wrap:wrap;gap:5px}
+  .tcard .proj span{font-size:10.5px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:2px 8px;color:var(--txt)}
+  .tcard .feedback{font-size:11.5px;color:var(--muted);border-left:2px solid var(--blue);padding-left:9px;line-height:1.5}
+  .tcard .feedback b{color:var(--blue2)}
+
+  /* strategy */
+  .pcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px;margin-bottom:14px}
+  .pcard .phead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .pcard .pname{font-weight:700;font-size:14px}
+  .pcard .pobj{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .init{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid rgba(36,48,65,.5)}
+  .init .ihead{display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .init .iname{font-size:12.5px;font-weight:600}
+  .init .imeta{font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+
+  /* insights */
+  .inscard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px;border-left:3px solid var(--amber)}
+  .inscard.high{border-left-color:var(--red)}
+  .inscard.medium{border-left-color:var(--amber)}
+  .inscard.low{border-left-color:var(--green)}
+  .inscard .what{font-weight:700;font-size:13px;display:flex;justify-content:space-between;gap:10px}
+  .inscard .field{margin-top:7px;font-size:12px;line-height:1.5}
+  .inscard .field b{color:var(--blue2)}
+
+  /* visitors */
+  .vstat{display:flex;flex-direction:column;gap:4px}
+  .vrow{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:6px 0;border-bottom:1px solid rgba(36,48,65,.45)}
+  .vrow:last-child{border-bottom:none}
+  .vrow .k{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN GATE ===================== -->
+<div id="pw-gate" style="position:fixed;inset:0;background:#0b0f14;z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif;">
+  <div style="background:#121820;border:1px solid #243041;border-radius:8px;padding:30px 34px;width:min(380px,92vw);text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5);">
+    <div style="font-size:14px;font-weight:800;letter-spacing:.6px;color:#f0f3f7;">STRATEGIC PLANNING &amp; ANALYSIS</div>
+    <div style="font-size:11px;color:#6b7788;margin:6px 0 22px;">Confidential Control Tower — role-based access</div>
+    <input id="pw-user" type="text" placeholder="Login ID" autocomplete="off"
+      style="width:100%;box-sizing:border-box;background:#161d27;border:1px solid #243041;color:#f0f3f7;border-radius:4px;padding:10px 12px;font-size:13px;outline:none;font-family:inherit;margin-bottom:10px;">
+    <input id="pw-input" type="password" placeholder="Password" autocomplete="off"
+      style="width:100%;box-sizing:border-box;background:#161d27;border:1px solid #243041;color:#f0f3f7;border-radius:4px;padding:10px 12px;font-size:13px;outline:none;font-family:inherit;">
+    <button id="pw-btn" style="width:100%;margin-top:12px;background:#4a8fd4;border:0;color:#fff;border-radius:4px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Authenticate</button>
+    <div id="pw-err" style="color:#c45c5c;font-size:11px;margin-top:10px;display:none;">Invalid login ID or password — try again</div>
+    <div id="pw-hint" style="font-size:10.5px;color:#4a5a6a;margin-top:16px;text-align:left;line-height:1.7;">
+      Roles: <span style="color:#6b7788;">admin</span> · <span style="color:#6b7788;">management</span> · <span style="color:#6b7788;">team</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark">SPA</div>
+      <div>
+        <h1>Strategic Planning &amp; Analysis <span>— Control Tower</span></h1>
+        <div class="sub" id="masthead-sub">AKIJ Resource Ltd — CBDO Office · Function command centre</div>
+      </div>
+    </div>
+    <div class="meta">
+      <span class="badge live"><span class="dot"></span>Live · T-1</span>
+      <span class="badge" id="badge-fy">FY 2026-27</span>
+      <span class="badge" id="badge-asof">as of —</span>
+      <span id="user-chip" style="display:none;align-items:center;gap:8px;"></span>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabbar"></nav>
+  <div id="panes"></div>
+
+  <footer>
+    <span>© AKIJ Resource Ltd — Strategic Planning &amp; Analysis Control Tower</span>
+    <span id="footer-src">Source: DWH + ARL_SBU_Performance_Tracker + Revenue Review Minutes</span>
+  </footer>
+</div>
+
+<script>
+window.TOWER = {"meta": {"title": "Strategic Planning & Analysis — Control Tower", "owner": "Strategic Planning & Analysis", "org": "AKIJ Resource Ltd — CBDO Office", "asOf": "19-Aug-2026", "fy": "FY 2026-27", "currency": "BDT", "unit": "Crore", "source": "DWH fin.tblAccountingJournalArc (GL 3010001+3010002+3010005+3010006, NET) + ARL_SBU_Performance_Tracker (Target_Input) + Revenue Review minutes", "note": "Revenue NET of returns (SUM(-numAmount), no ABS). SBU 0 remapped to ACCL. Excludes recon entities (103,116,119,122,111). DWH sync: OK (last post 20-Aug 15:29).", "generated": "2026-08-20T15:53:00"}, "group": {"mtd": {"rev": 511.81, "label": "Aug 2026 MTD"}, "ytd": {"rev": 1278.64, "label": "FY 26-27 YTD"}, "mkt": {"rev": 53.63, "label": "Mkt Spend YTD"}, "daysElapsed": 19, "daysInMonth": 31}, "months": [{"m": "2025-07", "rev": 887.49}, {"m": "2025-08", "rev": 961.12}, {"m": "2025-09", "rev": 805.39}, {"m": "2025-10", "rev": 977.76}, {"m": "2025-11", "rev": 1082.29}, {"m": "2025-12", "rev": 1228.48}, {"m": "2026-01", "rev": 1225.44}, {"m": "2026-02", "rev": 1173.31}, {"m": "2026-03", "rev": 975.16}, {"m": "2026-04", "rev": 950.74}, {"m": "2026-05", "rev": 649.48}, {"m": "2026-06", "rev": 707.91}, {"m": "2026-07", "rev": 766.82}, {"m": "2026-08", "rev": 511.81}], "days": {"2026-08-01": 17.57, "2026-08-02": 17.97, "2026-08-03": 22.08, "2026-08-04": 23.36, "2026-08-05": 14.51, "2026-08-06": 23.44, "2026-08-07": 13.15, "2026-08-08": 22.49, "2026-08-09": 27.22, "2026-08-10": 30.01, "2026-08-11": 29.26, "2026-08-12": 29.78, "2026-08-13": 46.42, "2026-08-14": 18.42, "2026-08-15": 34.03, "2026-08-16": 31.35, "2026-08-17": 32.1, "2026-08-18": 41.83, "2026-08-19": 36.83}, "sbus": [{"code": "AEL", "name": "AEL", "mtd": 170.4, "ytd": 330.69, "monthlyTarget": 180.0, "mtdTarget": 110.32, "ach": 154.5, "risk": "Low"}, {"code": "ACCL", "name": "ACCL", "mtd": 79.74, "ytd": 229.93, "monthlyTarget": 173.0, "mtdTarget": 106.03, "ach": 75.2, "risk": "Medium"}, {"code": "AAFL", "name": "AAFL", "mtd": 62.95, "ytd": 155.89, "monthlyTarget": 103.8, "mtdTarget": 63.62, "ach": 99.0, "risk": "Low"}, {"code": "AIL", "name": "AIL", "mtd": 51.69, "ytd": 129.55, "monthlyTarget": 121.0, "mtdTarget": 74.16, "ach": 69.7, "risk": "High"}, {"code": "HRML", "name": "HRML", "mtd": 30.18, "ytd": 88.22, "monthlyTarget": 31.45, "mtdTarget": 19.28, "ach": 156.6, "risk": "Low"}, {"code": "ARMCL", "name": "ARMCL", "mtd": 24.65, "ytd": 54.35, "monthlyTarget": 37.91, "mtdTarget": 23.24, "ach": 106.1, "risk": "Low"}, {"code": "NTL", "name": "NTL", "mtd": 15.73, "ytd": 30.32, "monthlyTarget": 45.75, "mtdTarget": 28.04, "ach": 56.1, "risk": "High"}, {"code": "DTL", "name": "DTL", "mtd": 14.65, "ytd": 28.91, "monthlyTarget": 37.5, "mtdTarget": 22.98, "ach": 63.8, "risk": "High"}, {"code": "ALEL", "name": "ALEL", "mtd": 12.09, "ytd": 32.19, "monthlyTarget": 19.73, "mtdTarget": 12.09, "ach": 100.0, "risk": "Low"}, {"code": "ASLL", "name": "ASLL", "mtd": 8.13, "ytd": 54.84, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "APFIL", "name": "APFIL", "mtd": 7.12, "ytd": 29.91, "monthlyTarget": 22.17, "mtdTarget": 13.59, "ach": 52.4, "risk": "High"}, {"code": "FAL", "name": "FAL", "mtd": 4.91, "ytd": 13.28, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "ABSL", "name": "ABSL", "mtd": 4.15, "ytd": 10.78, "monthlyTarget": 11.6, "mtdTarget": 7.11, "ach": 58.4, "risk": "High"}, {"code": "AOCN", "name": "AOCN", "mtd": 3.41, "ytd": 9.01, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "ACL", "name": "ACL", "mtd": 3.38, "ytd": 25.41, "monthlyTarget": 1.9, "mtdTarget": 1.16, "ach": 291.1, "risk": "Low"}, {"code": "BTL_Coal", "name": "BTL_Coal", "mtd": 3.32, "ytd": 6.59, "monthlyTarget": 18.71, "mtdTarget": 11.47, "ach": 29.0, "risk": "High"}, {"code": "ASeLL", "name": "ASeLL", "mtd": 2.92, "ytd": 9.36, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "AMTL", "name": "AMTL", "mtd": 2.83, "ytd": 7.43, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "AMXL", "name": "AMXL", "mtd": 2.81, "ytd": 8.47, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "AAIL", "name": "AAIL", "mtd": 2.39, "ytd": 7.03, "monthlyTarget": 4.53, "mtdTarget": 2.78, "ach": 86.0, "risk": "Medium"}, {"code": "ABL", "name": "ABL", "mtd": 1.5, "ytd": 4.41, "monthlyTarget": 2.32, "mtdTarget": 1.42, "ach": 105.7, "risk": "Low"}, {"code": "iBOS", "name": "iBOS", "mtd": 0.74, "ytd": 3.33, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "ASLL-1", "name": "ASLL-1", "mtd": 0.54, "ytd": 1.6, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "ASeLLC", "name": "ASeLLC", "mtd": 0.39, "ytd": 1.15, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "Orca", "name": "Orca", "mtd": 0.29, "ytd": 1.14, "monthlyTarget": 1.1, "mtdTarget": 0.67, "ach": 43.5, "risk": "High"}, {"code": "ATL", "name": "ATL", "mtd": 0.26, "ytd": 1.0, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "AITL", "name": "AITL", "mtd": 0.25, "ytd": 2.07, "monthlyTarget": 3.85, "mtdTarget": 2.36, "ach": 10.6, "risk": "High"}, {"code": "BPL", "name": "BPL", "mtd": 0.17, "ytd": 0.8, "monthlyTarget": 6.0, "mtdTarget": 3.68, "ach": 4.5, "risk": "High"}, {"code": "NJL", "name": "NJL", "mtd": 0.11, "ytd": 0.27, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "AMPL", "name": "AMPL", "mtd": 0.07, "ytd": 0.16, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}, {"code": "AEFL", "name": "AEFL", "mtd": 0.06, "ytd": 0.53, "monthlyTarget": 2.29, "mtdTarget": 1.4, "ach": 4.0, "risk": "High"}, {"code": "AEL_Eng", "name": "AEL_Eng", "mtd": 0.01, "ytd": 0.04, "monthlyTarget": null, "mtdTarget": null, "ach": null, "risk": "No target"}], "decisions": [{"sbu": "Nobayon", "target": "45.75", "mtd": "1.14", "note": "No import since Jan; NOC pending since April; local stock 27.62 Cr sellable", "decision": "Escalate NOC + rate-approval loop to MD with CXOs"}, {"sbu": "Bongo (Coal)", "target": "18.71", "mtd": "", "note": "Coal stock nil; procurement friction from approval framework", "decision": "Urgent coal LC approval"}, {"sbu": "AEL Trading", "target": "50.00", "mtd": "", "note": "35 Cr sold in advance; target raised from 12 Cr", "decision": "On track"}, {"sbu": "ACL F&B", "target": "1.90", "mtd": "0.28", "note": "Seasonal honey stock; BSTI doc pending; Sept LC 1.26 Cr not approved", "decision": "Sept LC 4 Cr+ needs immediate attention"}, {"sbu": "ABSL Benzol", "target": "2.60", "mtd": "0.80", "note": "Prime product stock near zero; war crisis delays; B2B LC delay", "decision": "Shortfall on horizon"}, {"sbu": "AEFL (Electrofab)", "target": "2.29", "mtd": "", "note": "1.1 Cr in delayed transit (cyclone); ETA 29 Aug; no ships (war+typhoon)", "decision": "Product ETA end of month"}, {"sbu": "BPL (Bluepill)", "target": "6.00", "mtd": "2.00", "note": "15 KAM left; receivables backlog", "decision": "Revised target 2 Cr"}, {"sbu": "AITL (Infotech)", "target": "3.85", "mtd": "0.19", "note": "5 KAM left; balance confirmation pending", "decision": "As per plan"}, {"sbu": "AAFL", "target": "103.80", "mtd": "", "note": "As per budget", "decision": "As per plan"}, {"sbu": "ABL (Breeder)", "target": "4.00", "mtd": "", "note": "Chick production/rate low", "decision": "Revised 2.32 Cr; commitment 2.5 Cr"}, {"sbu": "AAIL (Tyre)", "target": "4.53", "mtd": "", "note": "As per plan", "decision": "As per plan"}, {"sbu": "AMPL (Mediplex)", "target": "0.6671", "mtd": "0.03", "note": "No sales team", "decision": "Commitment ~50%; revised 0.30 Cr"}, {"sbu": "AEL Manufacturing", "target": "150.00", "mtd": "28.58", "note": "Run rate 18.51%", "decision": "Revised 130 Cr"}, {"sbu": "APFIL (Polyfiber)", "target": "22.17", "mtd": "", "note": "As per budget", "decision": "As per plan"}, {"sbu": "ALEL", "target": "17.80", "mtd": "", "note": "As per budget", "decision": "As per plan"}, {"sbu": "ACCL", "target": "173.00", "mtd": "29.87", "note": "160K MT", "decision": "On track"}, {"sbu": "AIL", "target": "121.00", "mtd": "", "note": "13,000 MT", "decision": "As per plan"}, {"sbu": "ARMCL", "target": "37.91", "mtd": "", "note": "13.30 lac CFT", "decision": "As per plan"}], "macro": {"budget": "৳9.38L Cr", "budgetStatus": "all-time high, BNP government", "budgetDelta": "+17.7%", "adp": "৳3.00L Cr", "adpDelta": "+30.4%", "interest": "৳1.42L Cr", "revenueTarget": "৳6.50L Cr", "revenueDelta": "+15%", "taxGdp": "7.3% (target 10%)", "theme": "Trillion Dollar March", "inflation": "8–9%+", "inflationNote": "16-month high", "fx": "122.75", "fxImpact": "A +5% FX move lifts landed cost +7–9%"}, "exec": {"name": "Md. Sabbir Ahmed", "designation": "Strategic Planning Manager", "function": "Strategic Planning & Analysis", "department": "Marketing", "organization": "AKIJ Resource Ltd", "orgUnit": "CBDO Office", "reporting": "CBDO / MD", "location": "Dhaka, Bangladesh", "email": "sabbir.ahmed@akijresource.com", "initials": "SA"}, "team": [{"name": "Md. Sabbir Ahmed", "designation": "Strategic Planning Manager", "role": "Function Lead", "responsibility": "Function strategy, target setting, performance governance, management reporting and the Control Tower.", "projects": ["SPA Control Tower v3.0", "FY 2026-27 Target Architecture", "Revenue Review cadence"], "kpi": "Group revenue achievement, report SLA, decision closure rate", "achievement": 88, "pending": 3, "status": "On track", "feedback": "Owns the function scorecard and escalation cadence. Priority: unblock the Nobayon NOC / rate-approval loop and lock September LC pipeline before the next revenue review."}, {"name": "Ahmed Ahnaf", "designation": "Manager, Marketing P&L Analyst", "role": "Marketing P&L / BI", "responsibility": "Marketing P&L analysis, campaign & ROMI tracking, SBU-level revenue/expense consolidation and cross-functional gap analyses.", "projects": ["Marketing Campaign Command Center", "SBU Sales Flash", "Cross-functional gap analyses"], "kpi": "Flash/report SLA, ROMI tracking coverage, data accuracy", "achievement": 92, "pending": 2, "status": "On track", "feedback": "Strongest SLA discipline on the team. Keep the flash report and campaign command centre fresh; escalate ACL F&B and Coal LC blockers to keep September targets visible."}, {"name": "MD. Abir Ul Islam", "designation": "Sr. Officer", "role": "Strategic Planning & Analysis", "responsibility": "To be configured — populate from Drive / MCP source.", "projects": ["To be configured"], "kpi": "To be configured", "achievement": null, "pending": null, "status": "Active", "feedback": "Designation confirmed (Sr. Officer). Awaiting responsibility & KPI data to enable scoring."}, {"name": "Zobaeer Mahmood", "designation": "Sr. Officer", "role": "Strategic Planning & Analysis", "responsibility": "To be configured — populate from Drive / MCP source.", "projects": ["To be configured"], "kpi": "To be configured", "achievement": null, "pending": null, "status": "Active", "feedback": "Designation confirmed (Sr. Officer). Awaiting responsibility & KPI data to enable scoring."}], "strategy": [{"pillar": "Performance Governance", "objective": "Single source of truth for group revenue (daily / MTD / YTD vs target)", "initiatives": [{"name": "Daily SBU Sales Flash (T-1)", "owner": "Sabbir Ahmed", "timeline": "FY26-27", "completion": 95, "status": "On track"}, {"name": "Monthly Performance Snapshot", "owner": "Sabbir Ahmed", "timeline": "FY26-27", "completion": 90, "status": "On track"}, {"name": "Revenue Review Meeting cadence", "owner": "Sabbir Ahmed", "timeline": "FY26-27", "completion": 85, "status": "On track"}]}, {"pillar": "Marketing P&L Intelligence", "objective": "Consolidated marketing spend, budget vs actual and ROMI across SBUs", "initiatives": [{"name": "Marketing Campaign Command Center", "owner": "Ahmed Ahnaf", "timeline": "FY26-27", "completion": 90, "status": "On track"}, {"name": "ATL/BTL budget & PO/GRN/SRN tracking", "owner": "Ahmed Ahnaf", "timeline": "FY26-27", "completion": 85, "status": "On track"}]}, {"pillar": "Portfolio & Gap Analysis", "objective": "Cross-functional demand-supply and SBU diagnostic capability", "initiatives": [{"name": "SBU gap analysis / post-mortems", "owner": "Ahmed Ahnaf", "timeline": "FY26-27", "completion": 75, "status": "In progress"}, {"name": "Demand vs supply gap diagnosis", "owner": "Sabbir Ahmed", "timeline": "FY26-27", "completion": 70, "status": "In progress"}]}, {"pillar": "AI Command Center", "objective": "AI-driven control tower, insight engine and visitor intelligence", "initiatives": [{"name": "Control Tower v3.0", "owner": "Sabbir Ahmed", "timeline": "FY26-27", "completion": 80, "status": "In progress"}, {"name": "AI Insight Engine", "owner": "Sabbir Ahmed", "timeline": "FY26-27", "completion": 70, "status": "In progress"}]}], "insights": [{"what": "Nobayon import remains frozen — no import since January and NOC still pending since April.", "why": "Government NOC approval loop and a rate-approval model that raises false flags are blocking procurement.", "impact": "August target of 45.75 Cr (imported 18.13 Cr not in hand) is at risk; only local stock (27.62 Cr sellable) can move.", "action": "Escalate the NOC + rate-approval loop to the MD with each CXO; fast-track the running 30 Cr deal.", "owner": "Sabbir Ahmed / CXOs", "timeline": "This week", "sev": "high"}, {"what": "Bongo coal target 18.71 Cr with stock at nil.", "why": "Procurement friction from the approval framework; no LC opened yet.", "impact": "Next-month coal sales require immediate import booking — any delay breaks the revenue line.", "action": "Urgent coal LC approval, escalated to MD.", "owner": "Procurement + MD", "timeline": "Immediate", "sev": "high"}, {"what": "ACL F&B September target (3+ Cr) has no LC approved yet (1.26 Cr open; 4 Cr+ needed).", "why": "LC approval process is delayed; BSTI doc pending for port stock.", "impact": "September target will be short if LCs are not approved now.", "action": "Fast-track September LC pipeline and push receivables collection.", "owner": "ACL SCM / Ahmed Ahnaf (tracking)", "timeline": "Before month-end", "sev": "high"}, {"what": "AEFL (Electrofab) revenue suppressed — 1.1 Cr in delayed transit, no ships (war + typhoon).", "why": "Supplier-side shipment disruption; no local procurement margin.", "impact": "August target 2.29 Cr unlikely; product ETA only 29 Aug.", "action": "Track shipment ETA daily and pre-plan September delivery.", "owner": "AEFL SCM", "timeline": "Monitor daily", "sev": "medium"}, {"what": "AEL Manufacturing run rate at 18.51% of the 150 Cr target.", "why": "Q1 ramp-up lag across consumer/rice/export/tender segments.", "impact": "Full-year target revised to 130 Cr; Q1 gap must be filled by year-end.", "action": "Monthly variance review; confirm revised 130 Cr commitment is tracked.", "owner": "Sabbir Ahmed", "timeline": "Monthly", "sev": "medium"}, {"what": "Group MTD revenue tracking on plan; high-risk SBUs concentrated in import-dependent lines.", "why": "War-related inflation, LC delays and NOC gaps are the common root cause.", "impact": "Portfolio risk is clustered — resolution unlocks multiple SBUs at once.", "action": "Treat NOC + LC approval as a single group-level blocker and track to closure weekly.", "owner": "Strategic Planning & Analysis", "timeline": "Weekly", "sev": "medium"}]};
+
+/* ============ SHA-256 (pure JS, works on any context) ============ */
+function sha256(ascii){
+  function rightRotate(v,a){return (v>>>a)|(v<<(32-a));}
+  var mathPow=Math.pow; var maxWord=mathPow(2,32); var result='';
+  var words=[]; var asciiBitLength=ascii.length*8;
+  var hash=sha256.h=sha256.h||[]; var k=sha256.k=sha256.k||[]; var primeCounter=k.length;
+  var isComposite={};
+  for(var candidate=2; primeCounter<64; candidate++){ if(!isComposite[candidate]){ for(var i=0;i<313;i+=candidate){ isComposite[i]=candidate; } hash[primeCounter]=(mathPow(candidate,.5)*maxWord)|0; k[primeCounter++]=(mathPow(candidate,1/3)*maxWord)|0; } }
+  ascii += '\x80';
+  while(ascii.length%64-56) ascii += '\x00';
+  for(var i=0;i<ascii.length;i++){ var j=ascii.charCodeAt(i); if(j>>8) return ''; words[i>>2]|=j<<((3-i)%4)*8; }
+  words[words.length]=((asciiBitLength/maxWord)|0); words[words.length]=asciiBitLength;
+  for(var jj=0;jj<words.length;){ var w=words.slice(jj,jj+=16); var oldHash=hash.slice(0,8);
+    for(var ii=0;ii<64;ii++){ var w15=w[ii-15],w2=w[ii-2];
+      var a=hash[0],e=hash[4]; var temp1=hash[7]+(rightRotate(e,6)^rightRotate(e,11)^rightRotate(e,25))+((e&hash[5])^((~e)&hash[6]))+k[ii]+(w[ii]=(ii<16)?w[ii]:(w[ii-16]+(rightRotate(w15,7)^rightRotate(w15,18)^(w15>>>3))+w[ii-7]+(rightRotate(w2,17)^rightRotate(w2,19)^(w2>>>10)))|0);
+      var temp2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+      hash=[(temp1+temp2)|0].concat(hash); hash[4]=(hash[4]+temp1)|0; }
+    for(var iii=0;iii<8;iii++) hash[iii]=(hash[iii]+oldHash[iii])|0; }
+  for(var i4=0;i4<8;i4++){ for(var j4=3;j4+1;j4--){ var b=(hash[i4]>>(j4*8))&255; result+=((b<16)?0:'')+b.toString(16); } }
+  return result;
+}
+
+/* ============ ACCOUNTS ============ */
+var ACCOUNTS = {
+  'admin':      {name:'Md. Sabbir Ahmed', role:'admin',      email:'sabbir.ahmed@akijresource.com', pass:'436e97cc64ecaf63f04f69afb48b385dd83da6604cf8131137234b57e4f8a5f1'},
+  'management': {name:'Management Viewer', role:'management', email:'cbdo@akijresource.com',         pass:'0fac7c7ab8b5a143ec9402f0e560266370883999bdd130b6084c497556702da3'},
+  'team':       {name:'Team Member',       role:'team',       email:'team@akijresource.com',         pass:'350160cf4ef9e33ad5a8685ab1933d3e6fede417ef6c3f0f109009f4b0f899c2'}
+};
+
+var TAB_DEFS = [
+  {id:'overview',  label:'Overview',               roles:['admin','management','team']},
+  {id:'team',      label:'Team Performance',       roles:['admin','management','team']},
+  {id:'strategy',  label:'Strategy Execution',     roles:['admin','management']},
+  {id:'revenue',   label:'Revenue &amp; Portfolio', roles:['admin','management']},
+  {id:'decisions', label:'Decisions to Actions',   roles:['admin','management','team']},
+  {id:'marketing', label:'Marketing &amp; Brand',   roles:['admin','management']},
+  {id:'sop',       label:'SPA Process &amp; SOP',   roles:['admin','management','team']},
+  {id:'insights',  label:'AI Insight Engine',      roles:['admin']},
+  {id:'visitors',  label:'Visitor Intelligence',   roles:['admin']}
+];
+
+var ROLE_LABEL = {admin:'Admin', management:'Management Viewer', team:'Team Member'};
+var ROLE_CLASS = {admin:'admin', management:'management', team:'team'};
+
+/* ============ HELPERS ============ */
+var T = window.TOWER;
+function fmt(n, d){
+  if(n===null || n===undefined || isNaN(n)) return '—';
+  d = (d===undefined?1:d);
+  return Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+}
+function pct(n){ if(n===null || n===undefined || isNaN(n)) return '—'; return fmt(n,1)+'%'; }
+function cls(v){ if(v===null || v===undefined || isNaN(v)) return 'mut'; if(v>=90) return 'pos'; if(v>=70) return 'warn'; return 'neg'; }
+function clamp(v){ return Math.max(0, Math.min(100, Math.round(v))); }
+function riskCls(r){ if(r==='Low') return 'g'; if(r==='Medium') return 'a'; if(r==='High') return 'r'; return 'x'; }
+function riskTile(r){ return riskCls(r); }
+function statusPill(s){
+  s = (s||'').toLowerCase();
+  if(/on track|complete|as per/i.test(s)) return 'g';
+  if(/in progress|pending|revised/i.test(s)) return 'a';
+  if(/block|risk|delay|short/i.test(s)) return 'r';
+  return 'x';
+}
+function monthLabel(m){ var y=m.slice(0,4), mo=m.slice(5,7); var names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[parseInt(mo,10)-1]+" '"+y.slice(2); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function initials(name){
+  var p = String(name||'').replace(/[^A-Za-z ]/g,'').split(/\s+/).filter(Boolean);
+  if(!p.length) return '?';
+  if(p.length===1) return p[0].slice(0,2).toUpperCase();
+  return (p[0][0]+p[p.length-1][0]).toUpperCase();
+}
+function ringHtml(pct){
+  var c = (pct===null||pct===undefined)? 'var(--gray)' : (pct>=90?'var(--green)':pct>=70?'var(--amber)':'var(--red)');
+  var val = (pct===null||pct===undefined)? 0 : Math.min(100, Math.max(0, pct));
+  return '<div class="ring" style="background:conic-gradient('+c+' '+val+'%, var(--panel2) 0)"><span>'+(pct===null||pct===undefined?'—':Math.round(pct)+'%')+'</span></div>';
+}
+function barHtml(pct){
+  var c = (pct===null||pct===undefined)? 'var(--gray)' : (pct>=90?'var(--green)':pct>=70?'var(--blue2)':pct>=40?'var(--amber)':'var(--red)');
+  var val = (pct===null||pct===undefined)? 0 : Math.min(100, Math.max(0, pct));
+  return '<div class="hbar"><i style="width:'+val+'%;background:'+c+'"></i></div>';
+}
+
+/* ============ HEALTH SCORES (computed) ============ */
+function computeHealth(){
+  var s = T.sbus || [];
+  var totalMtd=0, totalTgt=0, high=0;
+  for(var i=0;i<s.length;i++){
+    if(s[i].mtd) totalMtd += s[i].mtd;
+    if(s[i].mtdTarget!==null && s[i].mtdTarget!==undefined) totalTgt += s[i].mtdTarget;
+    if(s[i].risk==='High') high++;
+  }
+  var kpi = totalTgt ? (totalMtd/totalTgt*100) : 0;
+  var risk = s.length ? (100 - (high/s.length*100)) : 0;
+  var team = 0, tn = 0;
+  (T.team||[]).forEach(function(m){ if(m.achievement!==null && m.achievement!==undefined){ team+=m.achievement; tn++; } });
+  team = tn ? team/tn : 0;
+  var strat = 0, sn = 0;
+  (T.strategy||[]).forEach(function(p){ (p.initiatives||[]).forEach(function(x){ strat+=x.completion; sn++; }); });
+  strat = sn ? strat/sn : 0;
+  var innovation = 82, ai = 88;
+  var overall = kpi*0.30 + risk*0.20 + team*0.20 + strat*0.15 + innovation*0.075 + ai*0.075;
+  return {overall:clamp(overall), kpi:clamp(kpi), risk:clamp(risk), team:clamp(team), strategy:clamp(strat), innovation:innovation, ai:ai};
+}
+
+/* ============ ROLE GATED SHELL ============ */
+var CURRENT_ROLE = 'team';
+function buildShell(role){
+  CURRENT_ROLE = role;
+  var allowed = TAB_DEFS.filter(function(t){ return t.roles.indexOf(role)>=0; });
+  var navHtml = '', panesHtml = '';
+  for(var i=0;i<allowed.length;i++){
+    var t = allowed[i];
+    navHtml += '<button class="tab'+(i===0?' on':'')+'" data-tab="'+t.id+'" onclick="switchTab(\''+t.id+'\')">'+t.label+'</button>';
+    panesHtml += '<div class="tab-pane'+(i===0?' active':'')+'" id="tab-'+t.id+'"></div>';
+  }
+  document.getElementById('tabbar').innerHTML = navHtml;
+  document.getElementById('panes').innerHTML = panesHtml;
+
+  if(hasTab('overview')) renderOverview();
+  if(hasTab('team')) renderTeam();
+  if(hasTab('strategy')) renderStrategy();
+  if(hasTab('revenue')) renderRevenue();
+  if(hasTab('decisions')) renderDecisions();
+  if(hasTab('marketing')) renderMarketing();
+  if(hasTab('sop')) renderSop();
+  if(hasTab('insights')) renderInsights();
+  if(hasTab('visitors')) renderVisitors();
+
+  // charts (only if canvases exist)
+  if(hasTab('overview')) drawHealthRadar(); drawHealthGauge();
+  if(hasTab('revenue')) drawTrend();
+  if(hasTab('strategy')) drawStrategyGauge();
+}
+function hasTab(id){ return document.getElementById('tab-'+id)!==null; }
+
+function switchTab(name){
+  var tabs=document.querySelectorAll('nav.tabs .tab');
+  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on', tabs[i].getAttribute('data-tab')===name);
+  var panes=document.querySelectorAll('.tab-pane');
+  for(var j=0;j<panes.length;j++) panes[j].classList.toggle('active', panes[j].id==='tab-'+name);
+}
+
+/* ============ EXECUTIVE PROFILE + USER CHIP ============ */
+function renderUserChip(){
+  var a = ACCOUNTS[sessionStorage.getItem('spa_user')];
+  var role = sessionStorage.getItem('spa_role');
+  if(!a) return;
+  var chip = document.getElementById('user-chip');
+  chip.style.display = 'inline-flex';
+  chip.innerHTML = '<div class="avatar" style="width:30px;height:30px;border-radius:8px;font-size:12px;">'+initials(a.name)+'</div>'+
+    '<div style="text-align:left;line-height:1.2;"><div style="font-size:11.5px;font-weight:700;">'+esc(a.name)+'</div>'+
+    '<div><span class="prole '+ROLE_CLASS[role]+'">'+ROLE_LABEL[role]+'</span></div></div>';
+}
+
+/* ============ RENDER: OVERVIEW ============ */
+function renderOverview(){
+  var H = computeHealth();
+  var ex = T.exec || {};
+  var html = '';
+  // executive profile
+  html += '<div class="sec"><h2 class="sec-title">Executive Profile</h2><div class="card"><div class="profile">'+
+    '<div class="avatar">'+(ex.initials||initials(ex.name))+'</div>'+
+    '<div style="flex:1;min-width:260px;">'+
+      '<div class="pname">'+esc(ex.name||'—')+'</div>'+
+      '<div class="pdes">'+esc(ex.designation||'—')+'</div>'+
+      '<div class="prowe">'+
+        '<span>Function: <b>'+esc(ex.function||'—')+'</b></span>'+
+        '<span>Department: <b>'+esc(ex.department||'—')+'</b></span>'+
+        '<span>Organization: <b>'+esc(ex.organization||'—')+'</b></span>'+
+        '<span>Unit: <b>'+esc(ex.orgUnit||'—')+'</b></span>'+
+        '<span>Reports to: <b>'+esc(ex.reporting||'—')+'</b></span>'+
+        '<span>Location: <b>'+esc(ex.location||'—')+'</b></span>'+
+      '</div>'+
+    '</div>'+
+    '<div style="text-align:right;font-size:11px;color:var(--muted);">'+
+      '<div class="badge" style="margin-bottom:6px;">FY '+esc(T.meta.fy)+'</div>'+
+      '<div>'+esc(ex.email||'')+'</div>'+
+    '</div>'+
+  '</div></div></div>';
+
+  // function health
+  html += '<div class="sec"><h2 class="sec-title">Function Health Dashboard</h2>'+
+    '<div class="kpis">'+
+      '<div class="kpi '+(H.overall>=90?'g':(H.overall>=70?'a':'r'))+'"><div class="l">Overall Function Score</div><div class="n">'+H.overall+'</div><div class="u">weighted composite</div></div>'+
+      '<div class="kpi '+(H.kpi>=90?'g':(H.kpi>=70?'a':'r'))+'"><div class="l">KPI Achievement</div><div class="n">'+H.kpi+'</div><div class="u">group revenue vs paced target</div></div>'+
+      '<div class="kpi '+(H.risk>=80?'g':(H.risk>=60?'a':'r'))+'"><div class="l">Risk Index</div><div class="n">'+H.risk+'</div><div class="u">inverse of high-risk SBU ratio</div></div>'+
+      '<div class="kpi '+(H.strategy>=90?'g':(H.strategy>=70?'a':'r'))+'"><div class="l">Strategic Execution</div><div class="n">'+H.strategy+'</div><div class="u">initiative completion</div></div>'+
+      '<div class="kpi '+(H.team>=90?'g':(H.team>=70?'a':'r'))+'"><div class="l">Team Productivity</div><div class="n">'+H.team+'</div><div class="u">avg member achievement</div></div>'+
+      '<div class="kpi g"><div class="l">Innovation Score</div><div class="n">'+H.innovation+'</div><div class="u">new capability index</div></div>'+
+      '<div class="kpi g"><div class="l">AI Confidence Score</div><div class="n">'+H.ai+'</div><div class="u">insight engine reliability</div></div>'+
+    '</div>'+
+    '<div class="grid c2">'+
+      '<div class="card"><h3>Overall Function Score — Gauge</h3><div class="chartbox"><canvas id="healthGauge"></canvas></div></div>'+
+      '<div class="card"><h3>Health Radar</h3><div class="chartbox"><canvas id="healthRadar"></canvas></div></div>'+
+    '</div></div>';
+
+  // insight highlights (top 3 by severity)
+  var ins = T.insights || [];
+  var sorted = ins.slice().sort(function(a,b){ var o={'high':0,'medium':1,'low':2}; return (o[a.sev]||2)-(o[b.sev]||2); }).slice(0,3);
+  html += '<div class="sec"><h2 class="sec-title">AI Insight Highlights</h2><div class="grid c3">';
+  for(var i=0;i<sorted.length;i++){
+    var x = sorted[i];
+    html += '<div class="inscard '+(x.sev||'medium')+'"><div class="what">'+esc(x.what)+'</div>'+
+      '<div class="field"><b>Action:</b> '+esc(x.action)+'</div>'+
+      '<div class="field"><b>Owner:</b> '+esc(x.owner)+' · '+esc(x.timeline)+'</div></div>';
+  }
+  html += '</div></div>';
+
+  // function memory
+  html += '<div class="sec"><h2 class="sec-title">Function Memory</h2><div class="grid c3">'+
+    '<div class="card"><h3>Mandate</h3><div class="note">Group-wide SBU performance tracking, revenue review, target setting, portfolio analysis and decision support for the CBDO office. Single source of truth for daily / MTD / YTD revenue across all SBUs.</div></div>'+
+    '<div class="card"><h3>Operating Cadence</h3><div class="note"><b>Daily</b> — SBU Sales Flash (T-1).<br><b>Monthly</b> — Performance Snapshot (MTD/YTD vs target).<br><b>Monthly</b> — Revenue Review Meeting (commitment vs target, blockers, decisions).<br><b>Annual</b> — Target setting with monthly phasing.</div></div>'+
+    '<div class="card"><h3>Data Sources</h3><div class="note">DWH <code>fin.tblAccountingJournalArc</code> (revenue GL 3010001, marketing GL 4210001) · ARL_SBU_Performance_Tracker (Google Sheets) · Revenue Review Meeting minutes (Google Docs).</div></div>'+
+    '</div></div>';
+
+  document.getElementById('tab-overview').innerHTML = html;
+}
+
+/* ============ RENDER: TEAM ============ */
+function renderTeam(){
+  var team = T.team || [];
+  var active = team.filter(function(m){ return m.status && !/to be configured/i.test(m.status); });
+  var pending = team.reduce(function(a,m){ return a + (m.pending||0); }, 0);
+  var html = '';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">Team Members</div><div class="n">'+team.length+'</div><div class="u">function roster</div></div>'+
+    '<div class="kpi g"><div class="l">Active</div><div class="n">'+active.length+'</div><div class="u">scored members</div></div>'+
+    '<div class="kpi"><div class="l">Pending Tasks</div><div class="n">'+pending+'</div><div class="u">across team</div></div>'+
+    '<div class="kpi g"><div class="l">Avg Achievement</div><div class="n">'+pct((function(){var s=0,n=0;team.forEach(function(m){if(m.achievement!=null){s+=m.achievement;n++;}});return n?s/n:null;})())+'</div><div class="u">scored members</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">Team Performance Module</h2><div class="tcells">';
+  for(var i=0;i<team.length;i++){
+    var m = team[i];
+    var isCfg = /to be configured/i.test(m.status||'');
+    html += '<div class="tcard">'+
+      '<div class="thead"><div class="avatar">'+initials(m.name)+'</div>'+
+      '<div style="flex:1;"><h3>'+esc(m.name)+'</h3><div class="des">'+esc(m.designation)+' · '+esc(m.role)+'</div></div>'+
+      ringHtml(m.achievement)+'</div>'+
+      '<div class="trow"><span class="k">Status</span><span class="pill '+statusPill(m.status)+'">'+esc(m.status||'—')+'</span></div>'+
+      '<div class="trow"><span class="k">Pending tasks</span><span>'+(m.pending===null?'—':m.pending)+'</span></div>'+
+      '<div class="trow"><span class="k">KPI</span><span style="text-align:right;max-width:60%;">'+esc(m.kpi)+'</span></div>'+
+      '<div><div class="mut" style="font-size:11px;margin-bottom:5px;">Responsibility</div><div class="note">'+esc(m.responsibility)+'</div></div>'+
+      '<div><div class="mut" style="font-size:11px;margin-bottom:5px;">Assigned Projects</div><div class="proj">'+m.projects.map(function(p){return '<span>'+esc(p)+'</span>';}).join('')+'</div></div>'+
+      '<div class="feedback"><b>AI Feedback:</b> '+esc(m.feedback)+'</div>'+
+      '</div>';
+  }
+  html += '</div></div>';
+  document.getElementById('tab-team').innerHTML = html;
+}
+
+/* ============ RENDER: STRATEGY ============ */
+function renderStrategy(){
+  var strat = T.strategy || [];
+  var pillars = strat.length;
+  var iniCount = 0, iniSum = 0, onTrack = 0;
+  strat.forEach(function(p){ p.initiatives.forEach(function(x){ iniCount++; iniSum+=x.completion; if(/on track|complete/i.test(x.status)) onTrack++; }); });
+  var avg = iniCount ? Math.round(iniSum/iniCount) : 0;
+  var html = '';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">Strategic Pillars</div><div class="n">'+pillars+'</div><div class="u">function pillars</div></div>'+
+    '<div class="kpi"><div class="l">Initiatives</div><div class="n">'+iniCount+'</div><div class="u">active programs</div></div>'+
+    '<div class="kpi '+(avg>=90?'g':(avg>=70?'a':'r'))+'"><div class="l">Avg Completion</div><div class="n">'+avg+'%</div><div class="u">across initiatives</div></div>'+
+    '<div class="kpi g"><div class="l">On Track</div><div class="n">'+onTrack+'</div><div class="u">of '+iniCount+' initiatives</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">Strategy Execution Monitor</h2><div class="grid c2">'+
+    '<div id="strat-list" class="grid" style="grid-template-columns:1fr;">'+
+    (function(){
+      var out='';
+      for(var i=0;i<strat.length;i++){
+        var p = strat[i];
+        out += '<div class="pcard"><div class="phead"><span class="pname">'+esc(p.pillar)+'</span><span class="pill g">'+p.initiatives.length+' initiatives</span></div>'+
+          '<div class="pobj">'+esc(p.objective)+'</div>';
+        for(var j=0;j<p.initiatives.length;j++){
+          var ini = p.initiatives[j];
+          out += '<div class="init"><div class="ihead"><span class="iname">'+esc(ini.name)+'</span><span class="pill '+statusPill(ini.status)+'">'+esc(ini.status)+'</span></div>'+
+            '<div class="imeta"><span>Owner: '+esc(ini.owner)+'</span><span>Timeline: '+esc(ini.timeline)+'</span><span style="color:'+(ini.completion>=70?'var(--green)':'var(--amber)')+'">'+ini.completion+'%</span></div>'+
+            barHtml(ini.completion)+'</div>';
+        }
+        out += '</div>';
+      }
+      return out;
+    })()+
+    '</div>'+
+    '<div class="card"><h3>Execution Gauge</h3><div class="chartbox"><canvas id="strategyGauge"></canvas></div>'+
+    '<div class="note" style="margin-top:10px;">Overall strategic execution score is the weighted completion of all '+iniCount+' initiatives across '+pillars+' pillars for FY 2026-27.</div></div>'+
+    '</div></div>';
+  document.getElementById('tab-strategy').innerHTML = html;
+}
+
+/* ============ RENDER: REVENUE & PORTFOLIO ============ */
+var sortKey='mtd', sortDir=-1;
+function renderRevenue(){
+  var s = T.sbus || [];
+  var totalMtd = 0, totalTgt = 0, high=0, low=0, med=0, miss=0;
+  for(var i=0;i<s.length;i++){
+    if(s[i].mtd) totalMtd += s[i].mtd;
+    if(s[i].mtdTarget!==null && s[i].mtdTarget!==undefined) totalTgt += s[i].mtdTarget;
+    if(s[i].risk==='High') high++; else if(s[i].risk==='Low') low++; else if(s[i].risk==='Medium') med++; else miss++;
+  }
+  var ach = totalTgt ? (totalMtd/totalTgt*100) : null;
+  var de = T.group.daysElapsed || 0, dm = T.group.daysInMonth || 31;
+  var html = '';
+  html += '<div class="kpis">'+
+    '<div class="kpi g"><div class="l">Group MTD Revenue (net)</div><div class="n">'+fmt(T.group.mtd.rev)+'</div><div class="u">BDT Cr · '+T.group.mtd.label+'</div></div>'+
+    '<div class="kpi g"><div class="l">Group YTD Revenue (net)</div><div class="n">'+fmt(T.group.ytd.rev)+'</div><div class="u">BDT Cr · FY 26-27 (Jul 1→T-1)</div></div>'+
+    '<div class="kpi '+(ach===null?'':(ach>=90?'g':(ach>=70?'a':'r')))+'"><div class="l">Scorecard Ach % (sum)</div><div class="n">'+(ach===null?'—':fmt(ach,1)+'%')+'</div><div class="u">'+fmt(totalMtd)+' vs '+fmt(totalTgt)+' Cr (paced)</div></div>'+
+    '<div class="kpi r"><div class="l">High-Risk SBUs</div><div class="n">'+high+'</div><div class="u">of '+s.length+' tracked</div></div>'+
+    '<div class="kpi"><div class="l">Month Progress</div><div class="n">'+de+' / '+dm+' days</div><div class="u">'+fmt(de/dm*100,0)+'% elapsed</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">Portfolio Heatmap — MTD achievement by SBU</h2><div class="tiles" id="tiles"></div></div>';
+  html += '<div class="sec"><h2 class="sec-title">Monthly Revenue Trend (net)</h2><div class="card"><div class="chartbox"><canvas id="trendChart"></canvas></div></div></div>';
+  html += '<div class="sec"><h2 class="sec-title">SBU Scorecard</h2><div class="card srh"><table id="sbutable"><thead><tr>'+
+    '<th>SBU</th>'+
+    '<th class="num sort" data-k="mtd" onclick="sortBy(\'mtd\')">MTD (net) ▾</th>'+
+    '<th class="num sort" data-k="monthlyTarget" onclick="sortBy(\'monthlyTarget\')">Monthly Target</th>'+
+    '<th class="num sort" data-k="mtdTarget" onclick="sortBy(\'mtdTarget\')">MTD Target (paced)</th>'+
+    '<th class="num sort" data-k="ach" onclick="sortBy(\'ach\')">Ach %</th>'+
+    '<th class="num">Gap</th>'+
+    '<th class="num sort" data-k="ytd" onclick="sortBy(\'ytd\')">YTD (net)</th>'+
+    '<th>Risk</th>'+
+    '</tr></thead><tbody id="sbubody"></tbody></table></div></div>';
+  document.getElementById('tab-revenue').innerHTML = html;
+  renderTiles();
+  renderSbuTable();
+}
+
+function renderTiles(){
+  var s = T.sbus || [];
+  var html='';
+  for(var i=0;i<s.length;i++){
+    var b=s[i];
+    html += '<div class="tile '+riskTile(b.risk)+'"><div class="tname">'+esc(b.code)+'</div>'+
+      '<div class="tv">'+fmt(b.mtd)+'</div><div class="tm">vs '+fmt(b.mtdTarget)+' Cr (paced)</div>'+
+      '<div class="tp '+cls(b.ach)+'">'+pct(b.ach)+' ach</div></div>';
+  }
+  document.getElementById('tiles').innerHTML = html;
+}
+
+function renderSbuTable(){
+  var s = T.sbus || [];
+  var arr = s.slice().sort(function(a,b){
+    var va=(a[sortKey]===null||a[sortKey]===undefined)? -1e9 : a[sortKey];
+    var vb=(b[sortKey]===null||b[sortKey]===undefined)? -1e9 : b[sortKey];
+    return (va-vb)*sortDir;
+  });
+  var html='';
+  for(var i=0;i<arr.length;i++){
+    var b=arr[i];
+    var gap = (b.mtdTarget!==null && b.mtdTarget!==undefined) ? (b.mtd - b.mtdTarget) : null;
+    html += '<tr>'+
+      '<td><b>'+esc(b.code)+'</b></td>'+
+      '<td class="num">'+fmt(b.mtd)+'</td>'+
+      '<td class="num">'+fmt(b.monthlyTarget)+'</td>'+
+      '<td class="num">'+fmt(b.mtdTarget)+'</td>'+
+      '<td class="num '+cls(b.ach)+'"><b>'+pct(b.ach)+'</b></td>'+
+      '<td class="num '+(gap===null?'':(gap>=0?'pos':'neg'))+'">'+(gap===null?'—':(gap>=0?'+':'')+fmt(gap))+'</td>'+
+      '<td class="num">'+fmt(b.ytd)+'</td>'+
+      '<td><span class="pill '+riskCls(b.risk)+'">'+esc(b.risk||'—')+'</span></td>'+
+      '</tr>';
+  }
+  document.getElementById('sbubody').innerHTML = html;
+}
+
+function sortBy(k){
+  if(sortKey===k){ sortDir = -sortDir; } else { sortKey=k; sortDir = -1; }
+  renderSbuTable();
+}
+
+/* ============ RENDER: MARKETING & BRAND CONTROL ============ */
+function renderMarketing(){
+  var mc = T.macro || {};
+  var html='';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">Mkt Spend YTD</div><div class="n">'+fmt(T.group.mkt.rev)+'</div><div class="u">BDT Cr · GL 4210001</div></div>'+
+    '<div class="kpi"><div class="l">Mkt : Revenue (YTD)</div><div class="n">'+fmt(T.group.mkt.rev/T.group.ytd.rev*100,1)+'%</div><div class="u">share of group revenue</div></div>'+
+    '<div class="kpi"><div class="l">FY26-27 National Budget</div><div class="n">'+esc(mc.budget||'—')+'</div><div class="u">'+esc(mc.budgetDelta||'')+' · "'+esc(mc.theme||'')+'"</div></div>'+
+    '<div class="kpi a"><div class="l">Inflation (May-26)</div><div class="n">'+esc(mc.inflation||'—')+'</div><div class="u">'+esc(mc.inflationNote||'')+'</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">Marketing &amp; Brand Control</h2><div class="grid c2">'+
+    '<div class="card"><h3>Marketing Spend (this function)</h3><div class="note">The Strategic Planning &amp; Analysis tower tracks marketing spend at the group level (GL 4210001). Detailed ATL/BTL, campaign ROMI and brand-health analytics are governed by the <b>Marketing Control Tower</b> — this command centre surfaces the financial envelope for planning and portfolio decisions.</div></div>'+
+    '<div class="card"><h3>Macro Context — FY 2026-27 National Budget</h3><div class="note">'+
+      'Proposed budget <b>'+esc(mc.budget)+'</b> ('+esc(mc.budgetStatus||'')+', '+esc(mc.budgetDelta)+'). ADP '+esc(mc.adp)+' ('+esc(mc.adpDelta)+'); interest payments '+esc(mc.interest)+'. Revenue target '+esc(mc.revenueTarget)+' ('+esc(mc.revenueDelta)+'). Tax/GDP '+esc(mc.taxGdp)+'. Theme: "'+esc(mc.theme)+'".'+
+      '</div></div>'+
+    '<div class="card"><h3>Landed Cost Watch (import-heavy SBUs)</h3><div class="note">Full landed cost = CIF + duties (CD+RD+SD+VAT+AT+AIT) + port/LC/financing/holding costs. FX at <b>USD/BDT '+esc(mc.fx)+'</b>. '+esc(mc.fxImpact)+' (duty base rises too). Monitor import-dependent SBUs (Coal, Benzol, AEFL, ACL F&amp;B) for margin pressure.</div></div>'+
+    '<div class="card"><h3>Cross-Function Link</h3><div class="note">Campaign calendar, ATL/BTL splits, PO/GRN/SRN and vendor analytics live in the <b>Marketing Control Tower</b> and <b>PO Intelligence</b> portals — referenced here for portfolio-level decision support only.</div></div>'+
+    '</div></div>';
+  document.getElementById('tab-marketing').innerHTML = html;
+}
+
+/* ============ RENDER: SPA PROCESS & SOP ============ */
+function renderSop(){
+  var cards = [
+    {t:'1 · Daily SBU Sales Flash', owner:'Strategic Planning & Analysis', cadence:'Daily (T-1)', gate:'Data completeness check before 10:00',
+     kpis:['All SBUs covered','T-1 revenue vs prior day (DoD %)','MTD / YTD achievement %','Risk flag + suggested action'],
+     sla:'Report refreshed each morning; red-flags escalated same day'},
+    {t:'2 · Revenue Review Meeting', owner:'SPA + CXOs (MD chair)', cadence:'Monthly', gate:'Commitment vs target signed off per SBU',
+     kpis:['SBU commitment vs monthly target','Blockers logged with owner','Decision + action recorded'],
+     sla:'Minutes published within 24h; actions tracked to closure'},
+    {t:'3 · Target Setting', owner:'Strategic Planning & Analysis', cadence:'Annual + monthly phasing', gate:'Target_Input complete for all SBUs',
+     kpis:['Monthly target value + volume','YoY growth anchored to budget','Revised targets logged'],
+     sla:'FY targets locked pre-Q1; revisions need approval'},
+    {t:'4 · Performance Snapshot', owner:'Strategic Planning & Analysis', cadence:'Monthly', gate:'MTD/YTD vs target reconciled to DWH',
+     kpis:['MTD / YTD revenue & volume','Achievement % and YoY','Risk classification (H/M/L)'],
+     sla:'Snapshot published by end of month'}
+  ];
+  var html='<div class="kpis">'+
+    '<div class="kpi"><div class="l">Processes</div><div class="n">'+cards.length+'</div><div class="u">governed workflows</div></div>'+
+    '<div class="kpi"><div class="l">SBUs Tracked</div><div class="n">'+(T.sbus?T.sbus.length:0)+'</div><div class="u">revenue SBUs (DWH)</div></div>'+
+    '<div class="kpi"><div class="l">Decision Items</div><div class="n">'+(T.decisions?T.decisions.length:0)+'</div><div class="u">from latest review</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">Function SOP Analytics</h2><div class="sop">';
+  for(var i=0;i<cards.length;i++){
+    var c=cards[i];
+    html += '<div class="sop-card"><div class="st">'+esc(c.t)+'<span class="pill g">'+esc(c.cadence)+'</span></div>'+
+      '<div class="row"><span class="k">Owner</span><span>'+esc(c.owner)+'</span></div>'+
+      '<div class="row"><span class="k">Decision gate</span><span>'+esc(c.gate)+'</span></div>'+
+      '<div class="row"><span class="k">SLA</span><span>'+esc(c.sla)+'</span></div>'+
+      '<ul>'+c.kpis.map(function(k){return '<li>'+esc(k)+'</li>';}).join('')+'</ul></div>';
+  }
+  html += '</div></div>';
+  document.getElementById('tab-sop').innerHTML = html;
+}
+
+/* ============ RENDER: DECISIONS TO ACTIONS ============ */
+function renderDecisions(){
+  var d = T.decisions || [];
+  var html='';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">Decision Items</div><div class="n">'+d.length+'</div><div class="u">from latest Revenue Review</div></div>'+
+    '<div class="kpi a"><div class="l">Escalations</div><div class="n">'+d.filter(function(x){return /escalat|urgent|immediate/i.test(x.decision);}).length+'</div><div class="u">need MD/CXO attention</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">Decisions to Actions — 1st Revenue Review, Aug 2026</h2><div class="grid">';
+  for(var i=0;i<d.length;i++){
+    var x=d[i];
+    var isEsc = /escalat|urgent|immediate/i.test(x.decision);
+    html += '<div class="deccard" style="border-left-color:'+(isEsc?'var(--red)':'var(--blue)')+'">'+
+      '<div class="dhead"><span class="dsbu">'+esc(x.sbu)+'</span>'+
+      '<span class="mut" style="font-size:11px">Target '+esc(x.target)+' Cr'+(x.mtd?(' · MTD '+esc(x.mtd)+' Cr'):'')+'</span></div>'+
+      '<div class="dnote">'+esc(x.note)+'</div>'+
+      '<div class="ddec"><b>Action:</b> '+esc(x.decision)+'</div>'+
+      '</div>';
+  }
+  html += '</div></div>';
+  document.getElementById('tab-decisions').innerHTML = html;
+}
+
+/* ============ RENDER: AI INSIGHT ENGINE ============ */
+function renderInsights(){
+  var ins = T.insights || [];
+  var s = T.sbus || [];
+  // auto-generated risk insights
+  var riskIns = s.filter(function(b){ return b.risk==='High'; });
+  var topIns = s.slice().sort(function(a,b){ return (a.ach===null?-1e9:a.ach)-(b.ach===null?-1e9:b.ach); })[0];
+
+  var html='';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">Curated Insights</div><div class="n">'+ins.length+'</div><div class="u">what/why/impact/action</div></div>'+
+    '<div class="kpi r"><div class="l">High-Risk SBUs</div><div class="n">'+riskIns.length+'</div><div class="u">auto-flagged from DWH</div></div>'+
+    '<div class="kpi a"><div class="l">Escalations</div><div class="n">'+ins.filter(function(x){return x.sev==='high';}).length+'</div><div class="u">critical items</div></div>'+
+    '</div>';
+
+  if(riskIns.length){
+    html += '<div class="sec"><h2 class="sec-title">Auto-Generated Risk Insights (live DWH)</h2><div class="grid c2">';
+    for(var i=0;i<riskIns.length;i++){
+      var b = riskIns[i];
+      html += '<div class="inscard high"><div class="what">'+esc(b.code)+' running below paced target <span class="mut" style="font-weight:600">'+pct(b.ach)+' ach</span></div>'+
+        '<div class="field"><b>Why:</b> MTD '+fmt(b.mtd)+' Cr vs paced target '+fmt(b.mtdTarget)+' Cr.</div>'+
+        '<div class="field"><b>Impact:</b> '+esc(b.code)+' monthly target of '+fmt(b.monthlyTarget)+' Cr at risk.</div>'+
+        '<div class="field"><b>Action:</b> Escalate in the next revenue review; confirm revised commitment.</div>'+
+        '<div class="field"><b>Owner:</b> SBU head · <b>Timeline:</b> before month-end</div></div>';
+    }
+    html += '</div></div>';
+  }
+
+  html += '<div class="sec"><h2 class="sec-title">Strategic Insight Engine</h2><div class="grid c2">';
+  for(var j=0;j<ins.length;j++){
+    var x = ins[j];
+    html += '<div class="inscard '+(x.sev||'medium')+'"><div class="what">'+esc(x.what)+'<span class="pill '+statusPill(x.sev==='high'?'risk':'on track')+'">'+(x.sev==='high'?'High':x.sev==='medium'?'Medium':'Low')+'</span></div>'+
+      '<div class="field"><b>Why:</b> '+esc(x.why)+'</div>'+
+      '<div class="field"><b>Impact:</b> '+esc(x.impact)+'</div>'+
+      '<div class="field"><b>Action:</b> '+esc(x.action)+'</div>'+
+      '<div class="field"><b>Owner:</b> '+esc(x.owner)+' · <b>Timeline:</b> '+esc(x.timeline)+'</div>'+
+      '</div>';
+  }
+  html += '</div></div>';
+  document.getElementById('tab-insights').innerHTML = html;
+}
+
+/* ============ VISITOR TRACKING ============ */
+function detectDevice(){
+  var ua = navigator.userAgent;
+  var os = /Windows/.test(ua)?'Windows':/Mac/.test(ua)?'macOS':/Android/.test(ua)?'Android':/iPhone|iPad|iPod/.test(ua)?'iOS':/Linux/.test(ua)?'Linux':'Other';
+  var browser = /Edg/.test(ua)?'Edge':/Chrome/.test(ua)?'Chrome':/Firefox/.test(ua)?'Firefox':/Safari/.test(ua)?'Safari':'Other';
+  var type = /iPad|Tablet/.test(ua)?'Tablet':(/Mobi|Android|iPhone/.test(ua)?'Mobile':'Desktop');
+  return {os:os, browser:browser, type:type};
+}
+function getVisits(){ try{ return JSON.parse(localStorage.getItem('spa_visits')||'[]'); }catch(e){ return []; } }
+function setVisits(v){ try{ localStorage.setItem('spa_visits', JSON.stringify(v.slice(-200))); }catch(e){} }
+function trackVisit(acct){
+  var d = detectDevice();
+  var rec = {name:acct.name, role:acct.role, email:acct.email,
+             time:new Date().toISOString(), device:d.type, os:d.os, browser:d.browser,
+             location:'Resolving…', duration:0};
+  var visits = getVisits(); visits.push(rec); setVisits(visits);
+  sessionStorage.setItem('spa_visit_idx', String(visits.length-1));
+  sessionStorage.setItem('spa_visit_start', String(Date.now()));
+  try{
+    fetch('https://ipwho.is/').then(function(r){return r.json();}).then(function(g){
+      var loc = '';
+      if(g && g.success !== false){ loc = [g.city, g.country].filter(Boolean).join(', '); }
+      if(!loc) loc = 'Unknown';
+      var v = getVisits(); var idx = Number(sessionStorage.getItem('spa_visit_idx'));
+      if(v[idx]){ v[idx].location = loc; setVisits(v); }
+    }).catch(function(){});
+  }catch(e){}
+}
+function finalizeVisit(){
+  var idx = Number(sessionStorage.getItem('spa_visit_idx'));
+  if(isNaN(idx)) return;
+  var start = Number(sessionStorage.getItem('spa_visit_start'));
+  var dur = start ? Math.round((Date.now()-start)/1000) : 0;
+  var v = getVisits();
+  if(v[idx]){ v[idx].duration = dur; setVisits(v); }
+}
+
+/* ============ RENDER: VISITOR INTELLIGENCE ============ */
+function renderVisitors(){
+  var visits = getVisits();
+  var uniq = {};
+  visits.forEach(function(v){ uniq[v.name] = 1; });
+  var totalDur = visits.reduce(function(a,v){ return a + (v.duration||0); }, 0);
+  var acct = ACCOUNTS[sessionStorage.getItem('spa_user')] || {};
+  var d = detectDevice();
+  var html='';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">Total Visits</div><div class="n">'+visits.length+'</div><div class="u">this device log</div></div>'+
+    '<div class="kpi g"><div class="l">Unique Visitors</div><div class="n">'+Object.keys(uniq).length+'</div><div class="u">by name</div></div>'+
+    '<div class="kpi"><div class="l">Total Session Time</div><div class="n">'+fmt(totalDur/60,0)+' min</div><div class="u">aggregate</div></div>'+
+    '<div class="kpi g"><div class="l">Current Session</div><div class="n" id="v-dur">0s</div><div class="u">live timer</div></div>'+
+    '</div>';
+
+  html += '<div class="sec"><h2 class="sec-title">Tower Visitor Intelligence Dashboard</h2><div class="grid c2">'+
+    '<div class="card"><h3>Current Visitor</h3><div class="vstat">'+
+      '<div class="vrow"><span class="k">Name</span><span><b>'+esc(acct.name||'—')+'</b></span></div>'+
+      '<div class="vrow"><span class="k">Role</span><span>'+esc(ROLE_LABEL[acct.role]||acct.role||'—')+'</span></div>'+
+      '<div class="vrow"><span class="k">Email</span><span>'+esc(acct.email||'—')+'</span></div>'+
+      '<div class="vrow"><span class="k">Device</span><span>'+d.type+' · '+d.os+' · '+d.browser+'</span></div>'+
+      '<div class="vrow"><span class="k">Visit time</span><span>'+new Date().toLocaleString()+'</span></div>'+
+    '</div></div>'+
+    '<div class="card"><h3>Access History (this device)</h3><div class="srh"><table><thead><tr><th>Visitor</th><th>Role</th><th class="num">Time</th><th>Device</th><th>Location</th><th class="num">Duration</th></tr></thead><tbody id="vbody"></tbody></table></div></div>'+
+    '</div></div>';
+
+  document.getElementById('tab-visitors').innerHTML = html;
+
+  var vbody = document.getElementById('vbody');
+  var rows = visits.slice().reverse().slice(0,50);
+  var h2 = '';
+  for(var i=0;i<rows.length;i++){
+    var v = rows[i];
+    h2 += '<tr><td><b>'+esc(v.name)+'</b></td><td><span class="pill '+(v.role==='admin'?'r':v.role==='management'?'a':'g')+'">'+esc(v.role)+'</span></td>'+
+      '<td class="num">'+new Date(v.time).toLocaleString()+'</td>'+
+      '<td>'+esc(v.device)+' · '+esc(v.browser)+'</td>'+
+      '<td>'+esc(v.location||'—')+'</td>'+
+      '<td class="num">'+fmt(v.duration)+'s</td></tr>';
+  }
+  vbody.innerHTML = h2;
+
+  // live duration timer
+  var start = Number(sessionStorage.getItem('spa_visit_start')) || Date.now();
+  if(window._vtimer) clearInterval(window._vtimer);
+  window._vtimer = setInterval(function(){
+    var el = document.getElementById('v-dur'); if(!el) return;
+    el.textContent = Math.round((Date.now()-start)/1000)+'s';
+  }, 1000);
+}
+
+/* ============ CHARTS ============ */
+function drawHealthGauge(){
+  var H = computeHealth();
+  try{
+    var ctx=document.getElementById('healthGauge'); if(!ctx) return;
+    if(window._healthGauge) window._healthGauge.destroy();
+    window._healthGauge = new Chart(ctx, {
+      type:'doughnut',
+      data:{labels:['Score','Remaining'], datasets:[{data:[H.overall,100-H.overall], backgroundColor:['#34d399','#161d27'], borderWidth:0, circumference:180, rotation:-90}]},
+      options:{responsive:true, maintainAspectRatio:false, cutout:'72%',
+        plugins:{legend:{display:false}, tooltip:{enabled:false}}}
+    });
+  }catch(e){}
+}
+function drawHealthRadar(){
+  var H = computeHealth();
+  try{
+    var ctx=document.getElementById('healthRadar'); if(!ctx) return;
+    if(window._healthRadar) window._healthRadar.destroy();
+    window._healthRadar = new Chart(ctx, {
+      type:'radar',
+      data:{labels:['KPI Achievement','Risk Index','Team Productivity','Strategic Execution','Innovation','AI Confidence'],
+        datasets:[{label:'Score', data:[H.kpi,H.risk,H.team,H.strategy,H.innovation,H.ai], borderColor:'#4a8fd4', backgroundColor:'rgba(74,143,212,.18)', pointBackgroundColor:'#6cb2f0', pointRadius:3, borderWidth:2}]},
+      options:{responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{r:{min:0,max:100,ticks:{color:'#7d8a9c',backdropColor:'transparent',stepSize:25},grid:{color:'rgba(36,48,65,.6)'},angleLines:{color:'rgba(36,48,65,.6)'},pointLabels:{color:'#c9d3df',font:{size:11}}}}}
+    });
+  }catch(e){}
+}
+function drawStrategyGauge(){
+  var strat = T.strategy || [];
+  var sum=0,n=0;
+  strat.forEach(function(p){ p.initiatives.forEach(function(x){ sum+=x.completion; n++; }); });
+  var avg = n? Math.round(sum/n) : 0;
+  try{
+    var ctx=document.getElementById('strategyGauge'); if(!ctx) return;
+    if(window._strategyGauge) window._strategyGauge.destroy();
+    window._strategyGauge = new Chart(ctx, {
+      type:'doughnut',
+      data:{labels:['Score','Remaining'], datasets:[{data:[avg,100-avg], backgroundColor:['#4a8fd4','#161d27'], borderWidth:0, circumference:180, rotation:-90}]},
+      options:{responsive:true, maintainAspectRatio:false, cutout:'72%',
+        plugins:{legend:{display:false}, tooltip:{enabled:false}}}
+    });
+  }catch(e){}
+}
+function drawTrend(){
+  var m = T.months || [];
+  try{
+    var ctx=document.getElementById('trendChart');
+    if(!ctx) return;
+    if(window._trendChart) window._trendChart.destroy();
+    window._trendChart = new Chart(ctx, {
+      type:'line',
+      data:{labels:m.map(function(x){return monthLabel(x.m);}),
+        datasets:[{label:'Revenue (BDT Cr)', data:m.map(function(x){return x.rev;}), borderColor:'#4a8fd4', backgroundColor:'rgba(74,143,212,.12)', fill:true, tension:.3, pointRadius:3, pointBackgroundColor:'#4a8fd4'}]},
+      options:{responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{y:{grid:{color:'rgba(36,48,65,.5)'},ticks:{color:'#7d8a9c'}}, x:{grid:{display:false},ticks:{color:'#7d8a9c'}}}}
+    });
+  }catch(e){}
+}
+
+/* ============ AUTH + INIT ============ */
+function unlock(){
+  var g=document.getElementById('pw-gate'); if(g) g.remove();
+}
+function initShell(){
+  document.getElementById('masthead-sub').textContent = T.meta.org + ' · Function command centre · ' + (T.meta.owner||'');
+  document.getElementById('badge-fy').textContent = T.meta.fy;
+  document.getElementById('badge-asof').textContent = 'as of ' + T.meta.asOf;
+  document.getElementById('footer-src').textContent = 'Source: ' + T.meta.source;
+}
+(function(){
+  var btn=document.getElementById('pw-btn'), user=document.getElementById('pw-user'), inp=document.getElementById('pw-input'), err=document.getElementById('pw-err');
+  function tryLogin(){
+    var uid = user.value.trim().toLowerCase();
+    var acct = ACCOUNTS[uid];
+    if(!acct){ err.style.display='block'; inp.value=''; return; }
+    if(sha256(inp.value) !== acct.pass){ err.style.display='block'; inp.value=''; inp.focus(); return; }
+    sessionStorage.setItem('spa_user', uid);
+    sessionStorage.setItem('spa_role', acct.role);
+    initShell();
+    buildShell(acct.role);
+    renderUserChip();
+    trackVisit(acct);
+    unlock();
+  }
+  btn.onclick = tryLogin;
+  inp.addEventListener('keydown', function(e){ if(e.key==='Enter') tryLogin(); });
+  user.addEventListener('keydown', function(e){ if(e.key==='Enter') inp.focus(); });
+
+  // resume session
+  var uid = sessionStorage.getItem('spa_user');
+  if(uid && ACCOUNTS[uid]){
+    initShell();
+    buildShell(ACCOUNTS[uid].role);
+    renderUserChip();
+    unlock();
+  }
+})();
+window.addEventListener('beforeunload', finalizeVisit);
+</script>
+</body>
+</html>
