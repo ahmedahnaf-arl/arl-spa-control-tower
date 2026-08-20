@@ -180,6 +180,7 @@ def main():
         "team": TEAM,
         "strategy": STRATEGY,
         "insights": INSIGHTS,
+        "systems": check_systems(),
     }
 
     tmpl = open(os.path.join(BASE, "_template.html"), encoding="utf-8").read()
@@ -318,6 +319,48 @@ INSIGHTS = [
      "action": "Treat NOC + LC approval as a single group-level blocker and track to closure weekly.",
      "owner": "Strategic Planning & Analysis", "timeline": "Weekly", "sev": "medium"},
 ]
+
+SYSTEMS = [
+    {"key": "pms", "name": "AKIJ PMS", "label": "Procurement Management",
+     "type": "Remote MCP", "endpoint": "https://pms-mcp.vercel.app/api/mcp",
+     "tools": ["Sourcing", "Draft RFQ", "Comparative statement", "Price triggers",
+               "Material intelligence", "Freight intelligence", "Materials to order"],
+     "status": None},
+    {"key": "ims", "name": "AKIJ IMS", "label": "Inventory & Supply Chain",
+     "type": "Local MCP", "endpoint": ".mcpify server -> vercel-2x7dxqvgy-supply-chain4.vercel.app",
+     "tools": ["Inventory", "Warehouse", "Stock movements", "Supply chain"],
+     "status": None},
+    {"key": "finance", "name": "AKIJ Finance", "label": "Financial Statements",
+     "type": "Remote MCP", "endpoint": "https://akij-finance-app.vercel.app/api/mcp",
+     "tools": ["Income statement", "Balance sheet", "Cash flow", "Working capital",
+               "Coal LC & projection", "Profit centers"],
+     "status": None},
+]
+
+def check_systems():
+    import urllib.request, json
+    from urllib.error import HTTPError
+    init = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                       "params": {"protocolVersion": "2024-11-05", "capabilities": {},
+                                  "clientInfo": {"name": "spa-tower", "version": "1.0"}}})
+    for s in SYSTEMS:
+        if s["key"] == "ims":
+            p = os.environ.get("MCPIFY_PATH",
+                               r"C:\Users\Sayee\Documents\Default Project\.mcpify\dist\server.js")
+            s["status"] = "Online" if os.path.exists(p) else "Not installed"
+            continue
+        try:
+            req = urllib.request.Request(s["endpoint"], data=init.encode(),
+                                         headers={"Content-Type": "application/json",
+                                                  "Accept": "application/json, text/event-stream"},
+                                         method="POST")
+            urllib.request.urlopen(req, timeout=10)
+            s["status"] = "Online"
+        except HTTPError:
+            s["status"] = "Online"      # server responded (even 4xx/5xx) = reachable
+        except Exception:
+            s["status"] = "Offline"
+    return SYSTEMS
 
 if __name__ == "__main__":
     main()

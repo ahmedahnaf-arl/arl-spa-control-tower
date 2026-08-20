@@ -247,7 +247,8 @@ var TAB_DEFS = [
   {id:'marketing', label:'Marketing &amp; Brand',   roles:['admin','management']},
   {id:'sop',       label:'SPA Process &amp; SOP',   roles:['admin','management','team']},
   {id:'insights',  label:'AI Insight Engine',      roles:['admin']},
-  {id:'visitors',  label:'Visitor Intelligence',   roles:['admin']}
+  {id:'visitors',  label:'Visitor Intelligence',   roles:['admin']},
+  {id:'systems',   label:'Connected Systems',      roles:['admin','management']}
 ];
 
 var ROLE_LABEL = {admin:'Admin', management:'Management Viewer', team:'Team Member'};
@@ -336,6 +337,7 @@ function buildShell(role){
   if(hasTab('sop')) renderSop();
   if(hasTab('insights')) renderInsights();
   if(hasTab('visitors')) renderVisitors();
+  if(hasTab('systems')) renderSystems();
 
   // charts (only if canvases exist)
   if(hasTab('overview')) drawHealthRadar(); drawHealthGauge();
@@ -783,6 +785,38 @@ function renderVisitors(){
     var el = document.getElementById('v-dur'); if(!el) return;
     el.textContent = Math.round((Date.now()-start)/1000)+'s';
   }, 1000);
+}
+
+/* ============ RENDER: CONNECTED SYSTEMS ============ */
+function renderSystems(){
+  var sys = T.systems || [];
+  var online = sys.filter(function(s){ return s.status==='Online'; }).length;
+  var remote = sys.filter(function(s){ return s.type==='Remote MCP'; }).length;
+  var html='';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">Connected Systems</div><div class="n">'+sys.length+'</div><div class="u">MCP data sources</div></div>'+
+    '<div class="kpi g"><div class="l">Online</div><div class="n">'+online+'</div><div class="u">reachable right now</div></div>'+
+    '<div class="kpi"><div class="l">Connector Type</div><div class="n">'+remote+' remote / '+(sys.length-remote)+' local</div><div class="u">MCP servers</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">Connected Systems — MCP Integrations</h2><div class="grid c3">';
+  for(var i=0;i<sys.length;i++){
+    var s=sys[i];
+    var stc = s.status==='Online' ? 'var(--green)' : (s.status==='Offline' ? 'var(--red)' : 'var(--amber)');
+    var pillc = s.status==='Online' ? 'g' : (s.status==='Offline' ? 'r' : 'a');
+    html += '<div class="card" style="border-top:3px solid '+stc+'">'+
+      '<h3>'+esc(s.name)+'</h3>'+
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'+
+        '<span class="pill x">'+esc(s.type)+'</span>'+
+        '<span class="pill '+pillc+'">'+esc(s.status)+'</span>'+
+      '</div>'+
+      '<div class="note" style="font-weight:600;">'+esc(s.label)+'</div>'+
+      '<div class="note" style="margin-top:8px;"><b>Endpoint:</b> '+esc(s.endpoint)+'</div>'+
+      '<div class="proj" style="margin-top:10px;">'+s.tools.map(function(t){return '<span>'+esc(t)+'</span>';}).join('')+'</div>'+
+      '</div>';
+  }
+  html += '</div></div>';
+  html += '<div class="sec"><div class="card"><h3>How these feed the tower</h3><div class="note">These MCP connectors expose procurement (PMS), inventory / supply-chain (IMS) and finance (AKIJ Finance) data to the SPA AI agents. The tower surfaces their live connection status; the agents call their tools for sourcing, RFQ, stock and financial-statement analysis during strategic reviews and gap analyses.</div></div></div>';
+  document.getElementById('tab-systems').innerHTML = html;
 }
 
 /* ============ CHARTS ============ */
