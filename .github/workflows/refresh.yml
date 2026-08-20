@@ -10,20 +10,25 @@ permissions:
 
 jobs:
   rebuild:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: pip install pymssql google-auth
+      - name: Decode Sheets service account
+        run: echo "${{ secrets.SHEETS_SA_JSON }}" | base64 -d > "${{ runner.temp }}/sa.json"
 
       - name: Build tower
         env:
           DWH_SERVER: ${{ secrets.DWH_SERVER }}
           DWH_USER: ${{ secrets.DWH_USER }}
           DWH_PASSWORD: ${{ secrets.DWH_PASSWORD }}
-        run: python build.py
+          SHEETS_SA_PATH: ${{ runner.temp }}/sa.json
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install --quiet pymssql google-auth
+          python build.py
 
       - name: Commit refresh
         run: |
