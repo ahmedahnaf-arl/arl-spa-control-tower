@@ -354,7 +354,7 @@ def check_systems():
                                          headers={"Content-Type": "application/json",
                                                   "Accept": "application/json, text/event-stream"},
                                          method="POST")
-            urllib.request.urlopen(req, timeout=10)
+            urllib.request.urlopen(req, timeout=25)
             s["status"] = "Online"
         except HTTPError:
             s["status"] = "Online"      # server responded (even 4xx/5xx) = reachable
