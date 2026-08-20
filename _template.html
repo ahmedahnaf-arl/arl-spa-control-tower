@@ -248,7 +248,8 @@ var TAB_DEFS = [
   {id:'sop',       label:'SPA Process &amp; SOP',   roles:['admin','management','team']},
   {id:'insights',  label:'AI Insight Engine',      roles:['admin']},
   {id:'visitors',  label:'Visitor Intelligence',   roles:['admin']},
-  {id:'systems',   label:'Connected Systems',      roles:['admin','management']}
+  {id:'systems',   label:'Connected Systems',      roles:['admin','management']},
+  {id:'reports',   label:'Strategic Reports',      roles:['admin','management']}
 ];
 
 var ROLE_LABEL = {admin:'Admin', management:'Management Viewer', team:'Team Member'};
@@ -338,6 +339,7 @@ function buildShell(role){
   if(hasTab('insights')) renderInsights();
   if(hasTab('visitors')) renderVisitors();
   if(hasTab('systems')) renderSystems();
+  if(hasTab('reports')) renderReports();
 
   // charts (only if canvases exist)
   if(hasTab('overview')) drawHealthRadar(); drawHealthGauge();
@@ -817,6 +819,41 @@ function renderSystems(){
   html += '</div></div>';
   html += '<div class="sec"><div class="card"><h3>How these feed the tower</h3><div class="note">These MCP connectors expose procurement (PMS), inventory / supply-chain (IMS) and finance (AKIJ Finance) data to the SPA AI agents. The tower surfaces their live connection status; the agents call their tools for sourcing, RFQ, stock and financial-statement analysis during strategic reviews and gap analyses.</div></div></div>';
   document.getElementById('tab-systems').innerHTML = html;
+}
+
+/* ============ RENDER: STRATEGIC REPORTS ============ */
+function renderReports(){
+  var reps = T.reports || [];
+  var html='';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">Report Types</div><div class="n">'+reps.length+'</div><div class="u">daily / weekly / monthly / yearly</div></div>'+
+    '<div class="kpi g"><div class="l">Automation</div><div class="n">T-1</div><div class="u">generated from live DWH</div></div>'+
+    '<div class="kpi"><div class="l">Reporting Layers</div><div class="n">4</div><div class="u">strategic cadence</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">AI Powered SBU Strategic Control Tower — Reporting System</h2>'+
+    '<div class="note" style="margin-bottom:16px;">Digital Chief Strategy Officer loop: <b>Strategy → Execution → Performance → Gap → Recommendation → Action → Achievement</b> — running with minimum human intervention.</div>';
+  html += '<div class="grid c2">';
+  for(var i=0;i<reps.length;i++){
+    var r = reps[i];
+    html += '<div class="card">';
+    html += '<h3 style="display:flex;justify-content:space-between;align-items:center;">'+esc(r.title)+'<span class="pill g">'+esc(r.period)+'</span></h3>';
+    html += '<div class="kpis" style="grid-template-columns:repeat(2,1fr);margin-bottom:4px;">';
+    for(var j=0;j<r.kpis.length;j++){
+      var k = r.kpis[j];
+      html += '<div class="kpi"><div class="l">'+esc(k.l)+'</div><div class="n" style="font-size:16px;">'+esc(k.v)+'</div><div class="u">'+esc(k.note)+'</div></div>';
+    }
+    html += '</div>';
+    for(var b=0;b<r.blocks.length;b++){
+      var blk = r.blocks[b];
+      html += '<div style="margin-top:8px;"><div class="mut" style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">'+esc(blk.heading)+'</div>';
+      html += '<ul style="margin:4px 0 0 16px;font-size:12px;">';
+      for(var n=0;n<blk.items.length;n++){ html += '<li style="margin:2px 0;">'+esc(blk.items[n])+'</li>'; }
+      html += '</ul></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div></div>';
+  document.getElementById('tab-reports').innerHTML = html;
 }
 
 /* ============ CHARTS ============ */

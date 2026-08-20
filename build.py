@@ -152,6 +152,8 @@ def main():
                      "mtdTarget": mtd_tgt, "ach": ach, "risk": risk})
     sbus.sort(key=lambda x: -(x["mtd"] or 0))
 
+    reports = build_reports(rd, g_mtd, g_ytd, months, days, sbus, days_in_month)
+
     data = {
         "meta": {
             "title": "Strategic Planning & Analysis — Control Tower",
@@ -181,6 +183,7 @@ def main():
         "strategy": STRATEGY,
         "insights": INSIGHTS,
         "systems": check_systems(),
+        "reports": reports,
     }
 
     tmpl = open(os.path.join(BASE, "_template.html"), encoding="utf-8").read()
@@ -361,6 +364,109 @@ def check_systems():
         except Exception:
             s["status"] = "Offline"
     return SYSTEMS
+
+def build_reports(rd, g_mtd, g_ytd, months, days, sbus, days_in_month):
+    """Reporting System: Daily / Weekly / Monthly / Yearly strategic reports
+    generated from live DWH + targets. See _template.html 'reports' tab."""
+    group_mo_tgt = sum((s["monthlyTarget"] or 0) for s in sbus)
+    group_mtd_tgt = sum((s["mtdTarget"] or 0) for s in sbus)
+    ach = (g_mtd / group_mtd_tgt * 100) if group_mtd_tgt else None
+    high = [s for s in sbus if s["risk"] == "High"]
+    med = [s for s in sbus if s["risk"] == "Medium"]
+    low = [s for s in sbus if s["risk"] == "Low"]
+
+    day_keys = sorted(days.keys())
+    last = day_keys[-1] if day_keys else None
+    last_rev = days.get(last, 0) if last else 0
+    prev = day_keys[-2] if len(day_keys) > 1 else None
+    prev_rev = days.get(prev, 0) if prev else 0
+    dod = ((last_rev - prev_rev) / prev_rev * 100) if prev_rev else None
+
+    last7 = day_keys[-7:]
+    weekly_actual = sum(days[k] for k in last7)
+    weekly_tgt = (group_mo_tgt * 7 / days_in_month) if group_mo_tgt else None
+    weekly_ach = (weekly_actual / weekly_tgt * 100) if weekly_tgt else None
+
+    fy25 = sum(m["rev"] for m in months if "2025-07" <= m["m"] <= "2026-06")
+    strat_vals = [i["completion"] for p in STRATEGY for i in p["initiatives"]]
+    strat_avg = (sum(strat_vals) / len(strat_vals)) if strat_vals else 0
+    gap = (g_mtd - group_mtd_tgt) if group_mtd_tgt else None
+
+    def cr(v): return round(v, 2)
+    def fmt_ach(s): return (f"{s['ach']:.0f}% ach" if s["ach"] is not None else "no target")
+
+    return [
+        {"id": "daily", "title": "Daily Strategic Report",
+         "period": "T-1 · " + rd.strftime("%d %b %Y"),
+         "kpis": [
+             {"l": "Daily Achievement", "v": f"{cr(last_rev)} Cr",
+              "note": f"{dod:+.1f}% DoD" if dod is not None else "single day"},
+             {"l": "MTD Achievement", "v": f"{ach:.1f}%" if ach is not None else "—",
+              "note": "vs paced target"},
+             {"l": "Gap", "v": f"{gap:+.2f} Cr" if gap is not None else "—",
+              "note": "MTD vs paced target"},
+             {"l": "High-Risk SBUs", "v": str(len(high)), "note": f"of {len(sbus)} tracked"},
+         ],
+         "blocks": [
+             {"heading": "Risk",
+              "items": [f"{s['code']} — {fmt_ach(s)}" for s in high[:8]] or ["No high-risk SBUs"]},
+             {"heading": "Required Action",
+              "items": [i["action"] for i in INSIGHTS if i["sev"] == "high"][:5] or ["No critical actions"]},
+         ]},
+        {"id": "weekly", "title": "Weekly Strategic Report",
+         "period": f"Last {len(last7)} days",
+         "kpis": [
+             {"l": "Week Actual", "v": f"{cr(weekly_actual)} Cr", "note": "sum last 7 days"},
+             {"l": "Week Target", "v": f"{cr(weekly_tgt)} Cr" if weekly_tgt else "—",
+              "note": "monthly / days prorated"},
+             {"l": "Week Achievement", "v": f"{weekly_ach:.1f}%" if weekly_ach is not None else "—",
+              "note": "actual vs target"},
+             {"l": "Latest DoD", "v": f"{dod:+.1f}%" if dod is not None else "—",
+              "note": "day-over-day"},
+         ],
+         "blocks": [
+             {"heading": "Performance Trend (last 7 days)",
+              "items": [f"{k[8:10]}-{k[5:7]}: {days[k]:.2f} Cr" for k in last7]},
+             {"heading": "Risk Forecast",
+              "items": [f"{s['code']} — {s['risk']}" for s in (high + med)[:10]] or ["Low risk outlook"]},
+             {"heading": "Recovery Plan",
+              "items": [i["action"] for i in INSIGHTS if i["sev"] in ("high", "medium")][:6] or ["No recovery actions"]},
+         ]},
+        {"id": "monthly", "title": "Monthly Strategic Report",
+         "period": rd.strftime("%b %Y"),
+         "kpis": [
+             {"l": "KPI Achievement", "v": f"{ach:.1f}%" if ach is not None else "—",
+              "note": "group MTD vs paced"},
+             {"l": "MTD Revenue", "v": f"{cr(g_mtd)} Cr", "note": "group (net)"},
+             {"l": "On Track", "v": str(len(low)), "note": "SBUs ≥ 90% ach"},
+             {"l": "At Risk", "v": str(len(high)), "note": "SBUs < 70% ach"},
+         ],
+         "blocks": [
+             {"heading": "Achievement Status",
+              "items": [f"Low risk: {len(low)} · Medium: {len(med)} · High: {len(high)} SBUs",
+                        f"Group achievement {ach:.1f}% of paced target" if ach is not None else "No targets set"]},
+             {"heading": "Corrective Action",
+              "items": [f"{d['sbu']}: {d['decision']}" for d in DECISIONS][:8] or ["No decisions"]},
+         ]},
+        {"id": "yearly", "title": "Yearly Strategic Review",
+         "period": "FY 2026-27",
+         "kpis": [
+             {"l": "FY YTD Revenue", "v": f"{cr(g_ytd)} Cr", "note": "Jul 1 → T-1"},
+             {"l": "FY25 Revenue", "v": f"{cr(fy25)} Cr", "note": "prior full year"},
+             {"l": "Strategic Execution", "v": f"{strat_avg:.0f}%", "note": "initiative completion"},
+             {"l": "Strategic Pillars", "v": str(len(STRATEGY)), "note": "active pillars"},
+         ],
+         "blocks": [
+             {"heading": "Annual Achievement",
+              "items": [f"FY 26-27 YTD {cr(g_ytd)} Cr vs FY25 full-year {cr(fy25)} Cr"]},
+             {"heading": "Strategic Milestones",
+              "items": [f"{p['pillar']} — {sum(i['completion'] for i in p['initiatives'])/len(p['initiatives']):.0f}%" for p in STRATEGY]},
+             {"heading": "5-Year Progress",
+              "items": ["FY25 (14-mo history) baseline established; multi-year trajectory now tracked against strategic pillars.",
+                        f"Strategic execution at {strat_avg:.0f}% — the leading indicator for 5-year ambition"]},
+         ]},
+    ]
+
 
 if __name__ == "__main__":
     main()
