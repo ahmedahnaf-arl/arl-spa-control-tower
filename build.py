@@ -326,9 +326,9 @@ SYSTEMS = [
      "tools": ["Sourcing", "Draft RFQ", "Comparative statement", "Price triggers",
                "Material intelligence", "Freight intelligence", "Materials to order"],
      "status": None},
-    {"key": "ims", "name": "AKIJ IMS", "label": "Inventory & Supply Chain",
-     "type": "Local MCP", "endpoint": ".mcpify server -> vercel-2x7dxqvgy-supply-chain4.vercel.app",
-     "tools": ["Inventory", "Warehouse", "Stock movements", "Supply chain"],
+    {"key": "ims", "name": "AKIJ IMS", "label": "Inventory Management (DWH wms)",
+     "type": "Local MCP", "endpoint": "mcp-servers/akij-ims/server.py -> DWH wms schema",
+     "tools": ["Plants", "Inventory summary", "Stock movements", "Gate passes"],
      "status": None},
     {"key": "finance", "name": "AKIJ Finance", "label": "Financial Statements",
      "type": "Remote MCP", "endpoint": "https://akij-finance-app.vercel.app/api/mcp",
@@ -345,8 +345,8 @@ def check_systems():
                                   "clientInfo": {"name": "spa-tower", "version": "1.0"}}})
     for s in SYSTEMS:
         if s["key"] == "ims":
-            p = os.environ.get("MCPIFY_PATH",
-                               r"C:\Users\Sayee\Documents\Default Project\.mcpify\dist\server.js")
+            p = os.environ.get("IMS_MCP_PATH",
+                               r"C:\Users\Hp\Documents\Default Project\mcp-servers\akij-ims\server.py")
             s["status"] = "Online" if os.path.exists(p) else "Not installed"
             continue
         try:
