@@ -965,7 +965,17 @@ function renderSbu5Y(code){
   html += '<div id="st20content"></div>';
   html += '</div>';
   document.getElementById('sbu5y-detail').innerHTML = html;
-  switchSubTab20(window._sbu20.length ? window._sbu20[0].id : null);
+  var _c = document.getElementById('st20content');
+  if(_c && window._sbu20.length){
+    var _t0 = window._sbu20[0];
+    var _h = '';
+    for(var _b=0;_b<_t0.blocks.length;_b++){
+      _h += '<div style="margin:10px 0;"><div class="mut" style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">'+esc(_t0.blocks[_b].heading)+'</div><ul style="margin:4px 0 0 16px;font-size:12px;">';
+      for(var _n=0;_n<_t0.blocks[_b].items.length;_n++){ _h += '<li style="margin:2px 0;">'+esc(_t0.blocks[_b].items[_n])+'</li>'; }
+      _h += '</ul></div>';
+    }
+    _c.innerHTML = _h;
+  }
 }
 
 function switchSubTab20(id){
