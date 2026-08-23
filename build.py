@@ -154,7 +154,7 @@ def main():
 
     reports = build_reports(rd, g_mtd, g_ytd, months, days, sbus, days_in_month)
 
-    five_year = build_five_year(sbus)
+    five_year = build_strategy_detail(sbus, target_rows, g_ytd)
 
     data = {
         "meta": {
@@ -486,27 +486,161 @@ STRATEGY_DOCS = {
 }
 
 
-def build_five_year(sbus):
-    """Per-SBU 5-year strategic projection (FY27 -> FY31) from DWH targets/actuals.
-    Labelled STRATEGIC PROJECTION — a flat growth assumption, not an approved target."""
-    growth = 0.10
+CODE_REV = {v: k for k, v in CODE.items()}
+MONTH_MAP = {"JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
+             "JUL": "07", "AUG": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DEC": "12"}
+
+
+def norm_month(s):
+    s = str(s).strip()
+    if "-" not in s:
+        return s
+    mmm, yy = s.split("-", 1)
+    y = int(yy.strip())
+    if y < 100:
+        y += 2000
+    return "%d-%s" % (y, MONTH_MAP.get(mmm.strip()[:3].upper(), "00"))
+
+
+def activity_bucket(subgl):
+    s = (subgl or "").strip().lower()
+    if "g2g" in s:
+        return "Sales G2G"
+    if "foreign" in s:
+        return "Sales Foreign"
+    if "freight" in s or "charter" in s or "demurrage" in s:
+        return "Freight & Shipping"
+    if "agency" in s or "commission" in s:
+        return "Agency Commission"
+    if "subsidy" in s or "grant" in s:
+        return "Subsidy"
+    if "flight" in s or "holiday" in s or "visa" in s or "management fee" in s:
+        return "Services"
+    if "local" in s:
+        return "Sales Local"
+    return "Other"
+
+
+def build_strategy_detail(sbus, target_rows, group_ytd):
+    """Per-SBU deep strategy: monthly target-vs-actual gaps, activity-wise revenue,
+    BCG quadrant, action plans + owners."""
+    rows = q(f"""
+        SELECT CASE WHEN intSBUId=0 THEN 58 ELSE intSBUId END AS sbu,
+          FORMAT(dteTransactionDate,'yyyy-MM') AS m, SUM(-numAmount)/1e7 AS v
+        FROM fin.tblAccountingJournalArc
+        WHERE strGeneralLedgerCode IN {GL} AND isActive=1 AND intSBUId NOT IN {EXCL}
+          AND dteTransactionDate>='{fy_start_prev()}-07-01' AND {T1}
+        GROUP BY CASE WHEN intSBUId=0 THEN 58 ELSE intSBUId END, FORMAT(dteTransactionDate,'yyyy-MM')
+    """)
+    sbu_monthly = {}
+    for r in rows:
+        sbu_monthly.setdefault(int(r["sbu"]), {})[r["m"]] = round(float(r["v"] or 0), 2)
+
+    sbu_targets = {}
+    for r in target_rows[1:]:
+        if len(r) >= 4 and r[0] and r[1]:
+            m = norm_month(r[0])
+            sid = TARGET_MAP.get(str(r[1]).strip())
+            if sid is None:
+                continue
+            try:
+                val = float(str(r[3]).replace(",", "").strip())
+            except Exception:
+                val = 0.0
+            sbu_targets.setdefault(m, {}).setdefault(sid, 0.0)
+            sbu_targets[m][sid] += val
+
+    rows2 = q(f"""
+        SELECT CASE WHEN intSBUId=0 THEN 58 ELSE intSBUId END AS sbu, strSubGLName,
+          SUM(-numAmount)/1e7 AS v
+        FROM fin.tblAccountingJournalArc
+        WHERE strGeneralLedgerCode IN {GL} AND isActive=1 AND intSBUId NOT IN {EXCL}
+          AND dteTransactionDate>='{fy_start_prev()}-07-01' AND {T1}
+        GROUP BY CASE WHEN intSBUId=0 THEN 58 ELSE intSBUId END, strSubGLName
+    """)
+    sbu_activity = {}
+    for r in rows2:
+        b = activity_bucket(r["strSubGLName"])
+        sbu_activity.setdefault(int(r["sbu"]), {}).setdefault(b, 0.0)
+        sbu_activity[int(r["sbu"])][b] += float(r["v"] or 0)
+
+    today = date.today()
+    fy = today.year if today.month >= 7 else today.year - 1
+    cur_m = ["%d-07" % fy, "%d-08" % fy, "%d-09" % fy, "%d-10" % fy, "%d-11" % fy, "%d-12" % fy,
+             "%d-01" % (fy + 1), "%d-02" % (fy + 1), "%d-03" % (fy + 1), "%d-04" % (fy + 1),
+             "%d-05" % (fy + 1), "%d-06" % (fy + 1)]
+    prev_m = ["%d-07" % (fy - 1), "%d-08" % (fy - 1), "%d-09" % (fy - 1), "%d-10" % (fy - 1),
+              "%d-11" % (fy - 1), "%d-12" % (fy - 1), "%d-01" % fy, "%d-02" % fy, "%d-03" % fy,
+              "%d-04" % fy, "%d-05" % fy, "%d-06" % fy]
+    med_share = 1.0 / len(sbus)
+
     out = []
     for s in sbus:
-        base = (s["monthlyTarget"] or 0) * 12
-        if not base:
-            base = (s["ytd"] or 0) * 2
+        code = s["code"]
+        sid = CODE_REV.get(code)
+        # monthly gap rows (last 14 months)
+        all_m = sorted(set(sbu_targets.keys()) | set(sbu_monthly.get(sid, {}).keys()))
+        monthly = []
+        for m in all_m[-14:]:
+            tgt = sbu_targets.get(m, {}).get(sid)
+            act = sbu_monthly.get(sid, {}).get(m)
+            gap = round(act - tgt, 2) if (act is not None and tgt) else None
+            ach = round(act / tgt * 100, 1) if (act is not None and tgt) else None
+            monthly.append({"m": m, "t": tgt, "a": act, "gap": gap, "ach": ach})
+        # activity-wise
+        act_map = sbu_activity.get(sid, {})
+        activities = [{"k": k, "v": round(v, 2)} for k, v in act_map.items()]
+        activities.sort(key=lambda x: -x["v"])
+        activities = activities[:6]
+        # BCG
+        share = (s["ytd"] / group_ytd * 100) if group_ytd else 0
+        cur = sum(sbu_monthly.get(sid, {}).get(m, 0) for m in cur_m)
+        prev = sum(sbu_monthly.get(sid, {}).get(m, 0) for m in prev_m)
+        growth = round((cur - prev) / prev * 100, 1) if prev else None
+        hi_share = share >= med_share * 100
+        hi_growth = growth is not None and growth > 0
+        if hi_growth and hi_share:
+            quad = "Star"
+        elif not hi_growth and hi_share:
+            quad = "Cash Cow"
+        elif hi_growth and not hi_share:
+            quad = "Question Mark"
+        else:
+            quad = "Dog"
+        # actions + owners
+        actions = []
+        for d in DECISIONS:
+            if code.lower() in d["sbu"].lower() or d["sbu"].lower().startswith(code.lower()):
+                actions.append({"what": d["decision"], "owner": "CXO / MD", "note": d["note"]})
+        for i in INSIGHTS:
+            if code.lower() in (i["what"] + " " + i["owner"]).lower():
+                actions.append({"what": i["action"], "owner": i["owner"], "note": i["impact"]})
+        if not actions:
+            actions.append({"what": "Monitor monthly achievement; escalate if below 90% of target.",
+                            "owner": "SBU Head", "note": "Auto-generated"})
+        doc = STRATEGY_DOCS.get(code)
+        base_val = round(s["monthlyTarget"] * 12, 2) if s["monthlyTarget"] else round((s["ytd"] or 0) * 2, 2)
+        ga = 0.10
         proj = {}
-        val = base
+        pv = base_val
         for yr in range(27, 32):
-            proj["FY%d" % yr] = round(val, 2)
-            val *= (1 + growth)
-        doc = STRATEGY_DOCS.get(s["code"])
-        out.append({"code": s["code"], "base": round(base, 2), "projection": proj,
-                    "cagr": growth * 100, "doc": doc,
-                    "status": "Documented" if doc else "In progress",
-                    "mtd": s["mtd"], "ytd": s["ytd"],
-                    "monthlyTarget": s["monthlyTarget"], "ach": s["ach"], "risk": s["risk"]})
+            proj["FY%d" % yr] = round(pv, 2)
+            pv *= (1 + ga)
+        out.append({
+            "code": code, "base": base_val, "projection": proj, "cagr": ga * 100,
+            "monthly": monthly, "activities": activities,
+            "share": round(share, 2), "growth": growth, "quadrant": quad,
+            "actions": actions[:6], "doc": doc,
+            "status": "Documented" if doc else "In progress",
+            "mtd": s["mtd"], "ytd": s["ytd"], "monthlyTarget": s["monthlyTarget"],
+            "ach": s["ach"], "risk": s["risk"],
+        })
     return out
+
+
+def fy_start_prev():
+    y = date.today().year if date.today().month >= 7 else date.today().year - 1
+    return y - 1
 
 
 if __name__ == "__main__":

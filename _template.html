@@ -868,6 +868,19 @@ function renderStrategy5Y(){
     '<div class="kpi a"><div class="l">In Progress</div><div class="n">'+fy.filter(function(s){return s.status==='In progress';}).length+'</div><div class="u">awaiting strategy</div></div>'+
     '<div class="kpi"><div class="l">Horizon</div><div class="n">FY27-31</div><div class="u">5-year window</div></div>'+
     '</div>';
+  var quads = {Star:[], 'Cash Cow':[], 'Question Mark':[], 'Dog':[]};
+  for(var i=0;i<fy.length;i++){ if(quads[fy[i].quadrant]) quads[fy[i].quadrant].push(fy[i].code); }
+  html += '<div class="sec"><h2 class="sec-title">SBU Portfolio — BCG Matrix</h2><div class="grid c4">';
+  var qlabels = [['Star','g','High growth · High share'],['Question Mark','a','High growth · Low share'],['Cash Cow','g','Low growth · High share'],['Dog','r','Low growth · Low share']];
+  for(var qi=0;qi<qlabels.length;qi++){
+    var qn = qlabels[qi][0], qc2 = qlabels[qi][1], qd = qlabels[qi][2];
+    var bc = (qc2==='g'?'var(--green)':qc2==='a'?'var(--amber)':'var(--red)');
+    html += '<div class="card" style="border-top:3px solid '+bc+'">'+
+      '<h3>'+qn+' <span class="pill '+qc2+'">'+quads[qn].length+'</span></h3>'+
+      '<div class="note" style="font-size:11px;">'+qd+'</div>'+
+      '<div class="proj" style="margin-top:8px;">'+quads[qn].map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div></div>';
+  }
+  html += '</div></div>';
   html += '<div class="sec"><h2 class="sec-title">5-Year SBU Strategy — FY 2026-27 → FY 2030-31 (ACCL framework)</h2>'+
     '<div class="card"><div style="margin-bottom:10px;"><span class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Select SBU</span></div>'+
     '<select id="sbu5y" onchange="renderSbu5Y(this.value)" style="width:100%;max-width:340px;background:#161d27;color:#e6ebf2;border:1px solid #243041;border-radius:6px;padding:9px 12px;font-size:13px;font-family:inherit;">'+
@@ -886,21 +899,49 @@ function renderSbu5Y(code){
   if(!s) return;
   var proj = s.projection || {};
   var yrs = ['FY27','FY28','FY29','FY30','FY31'];
+  var qc = {Star:'g', 'Cash Cow':'g', 'Question Mark':'a', 'Dog':'r'};
   var html='';
-  html += '<div class="card" style="margin-top:14px;">'+
-    '<h3 style="display:flex;justify-content:space-between;align-items:center;">'+esc(s.code)+' — 5-Year Strategy'+
+  html += '<div class="card" style="margin-top:14px;">';
+  html += '<h3 style="display:flex;justify-content:space-between;align-items:center;">'+esc(s.code)+' — 5-Year Strategy'+
     '<span class="pill '+(s.status==='Documented'?'g':'a')+'">'+esc(s.status)+'</span></h3>';
   html += '<div class="kpis" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:6px;">'+
     '<div class="kpi"><div class="l">MTD (net)</div><div class="n">'+fmt(s.mtd)+'</div><div class="u">BDT Cr</div></div>'+
     '<div class="kpi"><div class="l">YTD (net)</div><div class="n">'+fmt(s.ytd)+'</div><div class="u">BDT Cr</div></div>'+
     '<div class="kpi"><div class="l">FY27 Base</div><div class="n">'+fmt(s.base)+'</div><div class="u">annualized target</div></div>'+
-    '<div class="kpi"><div class="l">CAGR (proj)</div><div class="n">'+fmt(s.cagr,0)+'%</div><div class="u">strategic assumption</div></div>'+
     '<div class="kpi '+cls(s.ach)+'"><div class="l">Ach %</div><div class="n">'+pct(s.ach)+'</div><div class="u">MTD vs paced</div></div>'+
+    '<div class="kpi"><div class="l">Portfolio Share</div><div class="n">'+fmt(s.share,2)+'%</div><div class="u">of group revenue</div></div>'+
+    '<div class="kpi '+(s.growth===null?'':(s.growth>=0?'g':'r'))+'"><div class="l">YoY Growth</div><div class="n">'+(s.growth===null?'—':(fmt(s.growth,1)+'%'))+'</div><div class="u">FY vs prior</div></div>'+
     '</div>';
-  html += '<div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;">5-Year Projection (STRATEGIC PROJECTION — 10% CAGR assumption)</div>';
-  html += '<div class="srh"><table><thead><tr><th class="num">FY27</th><th class="num">FY28</th><th class="num">FY29</th><th class="num">FY30</th><th class="num">FY31</th></tr></thead><tbody><tr>';
-  for(var y=0;y<yrs.length;y++){ html += '<td class="num">'+fmt(proj[yrs[y]])+'</td>'; }
-  html += '</tr></tbody></table></div>';
+  html += '<div class="grid c2">'+
+    '<div><div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;">BCG Quadrant</div>'+
+      '<span class="pill '+qc[s.quadrant]+'" style="font-size:14px;padding:6px 14px;">'+esc(s.quadrant)+'</span>'+
+      '<div class="note" style="margin-top:6px;">Growth '+(s.growth===null?'—':(s.growth>=0?'+':'')+fmt(s.growth,1)+'%) · Share '+fmt(s.share,2)+'%</div></div>'+
+    '<div><div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;">5-Year Projection (STRATEGIC PROJECTION)</div>'+
+      '<div class="srh"><table><thead><tr><th class="num">FY27</th><th class="num">FY28</th><th class="num">FY29</th><th class="num">FY30</th><th class="num">FY31</th></tr></thead><tbody><tr>'+
+      yrs.map(function(y){return '<td class="num">'+fmt(proj[y])+'</td>';}).join('')+'</tr></tbody></table></div></div>'+
+    '</div>';
+  html += '<div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;">Monthly Target vs Achievement — Gap Analysis</div>';
+  html += '<div class="srh"><table><thead><tr><th>Month</th><th class="num">Target (Cr)</th><th class="num">Actual (Cr)</th><th class="num">Gap (Cr)</th><th class="num">Ach %</th></tr></thead><tbody>';
+  var mon = s.monthly || [];
+  for(var i=0;i<mon.length;i++){
+    var m = mon[i];
+    var gapCls = m.gap===null?'mut':(m.gap>=0?'pos':'neg');
+    html += '<tr><td>'+esc(m.m)+'</td>'+
+      '<td class="num">'+fmt(m.t)+'</td>'+
+      '<td class="num">'+fmt(m.a)+'</td>'+
+      '<td class="num '+gapCls+'">'+(m.gap===null?'—':(m.gap>=0?'+':'')+fmt(m.gap))+'</td>'+
+      '<td class="num '+cls(m.ach)+'"><b>'+pct(m.ach)+'</b></td></tr>';
+  }
+  html += '</tbody></table></div>';
+  html += '<div class="grid c2">'+
+    '<div><div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;">Activity-wise Revenue (FY YTD)</div>'+
+      '<div class="srh"><table><thead><tr><th>Activity</th><th class="num">Revenue (Cr)</th></tr></thead><tbody>';
+    var acts = s.activities || [];
+    for(var a=0;a<acts.length;a++){ html += '<tr><td>'+esc(acts[a].k)+'</td><td class="num">'+fmt(acts[a].v)+'</td></tr>'; }
+    html += '</tbody></table></div></div>'+
+    '<div><div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;">Action Plans & Owners</div>'+
+    (function(){ var o=''; var as = s.actions || []; for(var i=0;i<as.length;i++){ o += '<div class="deccard" style="margin-bottom:8px;"><div class="ddec"><b>'+esc(as[i].what)+'</b></div><div class="dnote" style="margin:4px 0 0;">Owner: '+esc(as[i].owner)+'</div></div>'; } return o; })()+
+    '</div></div>';
   if(s.doc){
     html += '<div class="note" style="margin-top:10px;"><b>Strategy document:</b> <a href="'+esc(s.doc)+'" target="_blank">Open 20-tab strategy in Drive →</a></div>';
   } else {
