@@ -249,7 +249,8 @@ var TAB_DEFS = [
   {id:'insights',  label:'AI Insight Engine',      roles:['admin']},
   {id:'visitors',  label:'Visitor Intelligence',   roles:['admin']},
   {id:'systems',   label:'Connected Systems',      roles:['admin','management']},
-  {id:'reports',   label:'Strategic Reports',      roles:['admin','management']}
+  {id:'reports',   label:'Strategic Reports',      roles:['admin','management']},
+  {id:'strategy5y',label:'5-Year Strategy',        roles:['admin','management']}
 ];
 
 var ROLE_LABEL = {admin:'Admin', management:'Management Viewer', team:'Team Member'};
@@ -340,6 +341,7 @@ function buildShell(role){
   if(hasTab('visitors')) renderVisitors();
   if(hasTab('systems')) renderSystems();
   if(hasTab('reports')) renderReports();
+  if(hasTab('strategy5y')) renderStrategy5Y();
 
   // charts (only if canvases exist)
   if(hasTab('overview')) drawHealthRadar(); drawHealthGauge();
@@ -854,6 +856,62 @@ function renderReports(){
   }
   html += '</div></div>';
   document.getElementById('tab-reports').innerHTML = html;
+}
+
+/* ============ RENDER: 5-YEAR STRATEGY ============ */
+function renderStrategy5Y(){
+  var fy = T.five_year || [];
+  var html='';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">SBUs</div><div class="n">'+fy.length+'</div><div class="u">strategy coverage</div></div>'+
+    '<div class="kpi g"><div class="l">Documented</div><div class="n">'+fy.filter(function(s){return s.status==='Documented';}).length+'</div><div class="u">with strategy docs</div></div>'+
+    '<div class="kpi a"><div class="l">In Progress</div><div class="n">'+fy.filter(function(s){return s.status==='In progress';}).length+'</div><div class="u">awaiting strategy</div></div>'+
+    '<div class="kpi"><div class="l">Horizon</div><div class="n">FY27-31</div><div class="u">5-year window</div></div>'+
+    '</div>';
+  html += '<div class="sec"><h2 class="sec-title">5-Year SBU Strategy — FY 2026-27 → FY 2030-31 (ACCL framework)</h2>'+
+    '<div class="card"><div style="margin-bottom:10px;"><span class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Select SBU</span></div>'+
+    '<select id="sbu5y" onchange="renderSbu5Y(this.value)" style="width:100%;max-width:340px;background:#161d27;color:#e6ebf2;border:1px solid #243041;border-radius:6px;padding:9px 12px;font-size:13px;font-family:inherit;">'+
+    fy.map(function(s){return '<option value="'+esc(s.code)+'">'+esc(s.code)+'</option>';}).join('')+
+    '</select></div>'+
+    '<div id="sbu5y-detail"></div></div>';
+  document.getElementById('tab-strategy5y').innerHTML = html;
+  renderSbu5Y(fy.length ? fy[0].code : null);
+}
+
+function renderSbu5Y(code){
+  var fy = T.five_year || [];
+  var tabs = T.five_year_tabs || [];
+  var s = null;
+  for(var i=0;i<fy.length;i++){ if(fy[i].code===code) s=fy[i]; }
+  if(!s) return;
+  var proj = s.projection || {};
+  var yrs = ['FY27','FY28','FY29','FY30','FY31'];
+  var html='';
+  html += '<div class="card" style="margin-top:14px;">'+
+    '<h3 style="display:flex;justify-content:space-between;align-items:center;">'+esc(s.code)+' — 5-Year Strategy'+
+    '<span class="pill '+(s.status==='Documented'?'g':'a')+'">'+esc(s.status)+'</span></h3>';
+  html += '<div class="kpis" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:6px;">'+
+    '<div class="kpi"><div class="l">MTD (net)</div><div class="n">'+fmt(s.mtd)+'</div><div class="u">BDT Cr</div></div>'+
+    '<div class="kpi"><div class="l">YTD (net)</div><div class="n">'+fmt(s.ytd)+'</div><div class="u">BDT Cr</div></div>'+
+    '<div class="kpi"><div class="l">FY27 Base</div><div class="n">'+fmt(s.base)+'</div><div class="u">annualized target</div></div>'+
+    '<div class="kpi"><div class="l">CAGR (proj)</div><div class="n">'+fmt(s.cagr,0)+'%</div><div class="u">strategic assumption</div></div>'+
+    '<div class="kpi '+cls(s.ach)+'"><div class="l">Ach %</div><div class="n">'+pct(s.ach)+'</div><div class="u">MTD vs paced</div></div>'+
+    '</div>';
+  html += '<div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;">5-Year Projection (STRATEGIC PROJECTION — 10% CAGR assumption)</div>';
+  html += '<div class="srh"><table><thead><tr><th class="num">FY27</th><th class="num">FY28</th><th class="num">FY29</th><th class="num">FY30</th><th class="num">FY31</th></tr></thead><tbody><tr>';
+  for(var y=0;y<yrs.length;y++){ html += '<td class="num">'+fmt(proj[yrs[y]])+'</td>'; }
+  html += '</tr></tbody></table></div>';
+  if(s.doc){
+    html += '<div class="note" style="margin-top:10px;"><b>Strategy document:</b> <a href="'+esc(s.doc)+'" target="_blank">Open 20-tab strategy in Drive →</a></div>';
+  } else {
+    html += '<div class="note" style="margin-top:10px;color:var(--amber);"><b>Strategy document:</b> In progress — not yet uploaded to the 5-Year Strategy drive.</div>';
+  }
+  html += '<div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;">20-Tab Strategy Framework (ACCL structure)</div>';
+  html += '<div class="proj">';
+  for(var t=0;t<tabs.length;t++){ html += '<span>'+esc(tabs[t])+'</span>'; }
+  html += '</div>';
+  html += '</div>';
+  document.getElementById('sbu5y-detail').innerHTML = html;
 }
 
 /* ============ CHARTS ============ */

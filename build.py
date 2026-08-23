@@ -154,6 +154,8 @@ def main():
 
     reports = build_reports(rd, g_mtd, g_ytd, months, days, sbus, days_in_month)
 
+    five_year = build_five_year(sbus)
+
     data = {
         "meta": {
             "title": "Strategic Planning & Analysis — Control Tower",
@@ -184,6 +186,8 @@ def main():
         "insights": INSIGHTS,
         "systems": check_systems(),
         "reports": reports,
+        "five_year": five_year,
+        "five_year_tabs": FIVE_YEAR_TABS,
     }
 
     tmpl = open(os.path.join(BASE, "_template.html"), encoding="utf-8").read()
@@ -466,6 +470,43 @@ def build_reports(rd, g_mtd, g_ytd, months, days, sbus, days_in_month):
                         f"Strategic execution at {strat_avg:.0f}% — the leading indicator for 5-year ambition"]},
          ]},
     ]
+
+
+FIVE_YEAR_TABS = ["Dashboard", "QSA", "SWOT+TOWS", "Marketing Led", "PESTEL", "Porter's 5",
+                  "CPM", "Product BCG", "SJA+SOAR", "VRIO", "CVP+BMC", "Contradictions",
+                  "FY25-26 GAP", "Business Plan", "BSC+GAP", "5-Year Plan", "Way Forward",
+                  "Execution Plan", "Risk & Mitigation", "Playbook"]
+
+# SBU -> 5-year strategy drive folder (built incrementally under "AR Strategy 05 Years")
+STRATEGY_DOCS = {
+    "AAFL": "https://drive.google.com/drive/folders/1wUImfOEgJahcBEzvV3nhgkTBMfT-9nlO",
+    "AAIL": "https://drive.google.com/drive/folders/12WQ16E4S7e1eiyVzr90oC4f2iisGLrxP",
+    "ACCL": "https://drive.google.com/drive/folders/1nA-K0ymRhl0k_ZSqqmWsiadcZraVI5ca",
+    "AEL":  "https://drive.google.com/drive/folders/1I-Q-gB5JvT_txGxIR_35zVOVzd_n7roh",
+}
+
+
+def build_five_year(sbus):
+    """Per-SBU 5-year strategic projection (FY27 -> FY31) from DWH targets/actuals.
+    Labelled STRATEGIC PROJECTION — a flat growth assumption, not an approved target."""
+    growth = 0.10
+    out = []
+    for s in sbus:
+        base = (s["monthlyTarget"] or 0) * 12
+        if not base:
+            base = (s["ytd"] or 0) * 2
+        proj = {}
+        val = base
+        for yr in range(27, 32):
+            proj["FY%d" % yr] = round(val, 2)
+            val *= (1 + growth)
+        doc = STRATEGY_DOCS.get(s["code"])
+        out.append({"code": s["code"], "base": round(base, 2), "projection": proj,
+                    "cagr": growth * 100, "doc": doc,
+                    "status": "Documented" if doc else "In progress",
+                    "mtd": s["mtd"], "ytd": s["ytd"],
+                    "monthlyTarget": s["monthlyTarget"], "ach": s["ach"], "risk": s["risk"]})
+    return out
 
 
 if __name__ == "__main__":
