@@ -978,13 +978,30 @@ function renderSbu5Y(code){
   if(_c && window._sbu20.length){
     var _t0 = window._sbu20[0];
     var _h = '';
-    for(var _b=0;_b<_t0.blocks.length;_b++){
-      _h += '<div style="margin:10px 0;"><div class="mut" style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">'+esc(_t0.blocks[_b].heading)+'</div><ul style="margin:4px 0 0 16px;font-size:12px;">';
-      for(var _n=0;_n<_t0.blocks[_b].items.length;_n++){ _h += '<li style="margin:2px 0;">'+esc(_t0.blocks[_b].items[_n])+'</li>'; }
-      _h += '</ul></div>';
-    }
+    for(var _b=0;_b<_t0.blocks.length;_b++){ _h += renderBlock20(_t0.blocks[_b]); }
     _c.innerHTML = _h;
   }
+}
+
+function renderBlock20(blk){
+  var h = '<div style="margin:12px 0;"><div class="mut" style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">'+esc(blk.heading)+'</div>';
+  if(blk.table){
+    h += '<div class="srh" style="margin-top:5px;"><table><thead><tr>';
+    for(var i=0;i<blk.table.headers.length;i++){ h += '<th'+(i>0?' class="num"':'')+'>'+esc(blk.table.headers[i])+'</th>'; }
+    h += '</tr></thead><tbody>';
+    for(var r=0;r<blk.table.rows.length;r++){
+      h += '<tr>';
+      for(var c=0;c<blk.table.rows[r].length;c++){ h += '<td'+(c>0?' class="num"':'')+'><b>'+esc(blk.table.rows[r][c])+'</b></td>'; }
+      h += '</tr>';
+    }
+    h += '</tbody></table></div>';
+  } else {
+    h += '<ul style="margin:5px 0 0 16px;font-size:12px;line-height:1.55;">';
+    for(var n=0;n<blk.items.length;n++){ h += '<li style="margin:3px 0;">'+esc(blk.items[n])+'</li>'; }
+    h += '</ul>';
+  }
+  h += '</div>';
+  return h;
 }
 
 function switchSubTab20(id){
@@ -999,13 +1016,7 @@ function switchSubTab20(id){
   for(var i=0;i<(window._sbu20||[]).length;i++){ if(window._sbu20[i].id===id) tab=window._sbu20[i]; }
   if(!tab) return;
   var html='';
-  for(var b=0;b<tab.blocks.length;b++){
-    var blk = tab.blocks[b];
-    html += '<div style="margin:10px 0;"><div class="mut" style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">'+esc(blk.heading)+'</div>'+
-      '<ul style="margin:4px 0 0 16px;font-size:12px;">';
-    for(var n=0;n<blk.items.length;n++){ html += '<li style="margin:2px 0;">'+esc(blk.items[n])+'</li>'; }
-    html += '</ul></div>';
-  }
+  for(var b=0;b<tab.blocks.length;b++){ html += renderBlock20(tab.blocks[b]); }
   var chartTabs = {dashboard:1, gap:1, bcg:1, fiveplan:1};
   if(chartTabs[id]){
     html += '<div class="card" style="margin-top:12px;"><div class="chartbox" style="height:260px;"><canvas id="sbuChart"></canvas></div></div>';

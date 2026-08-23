@@ -650,7 +650,7 @@ def _blk(heading, items):
 
 
 def build_20tab(d):
-    """Generate the complete 20-tab ACCL narrative for one SBU, data-informed from DWH."""
+    """Generate the complete 20-tab ACCL narrative for one SBU — detailed, data-informed from DWH."""
     code = d["code"]; ach = d["ach"]; risk = d["risk"] or "—"
     growth = d["growth"]; share = d["share"]; quad = d["quadrant"]
     mtd = d["mtd"]; ytd = d["ytd"]; mtgt = d["monthlyTarget"]
@@ -663,175 +663,251 @@ def build_20tab(d):
             return "—"
         return ("+" if growth >= 0 else "") + str(growth) + "%"
 
-    # activity BCG (growth vs share of SBU revenue)
-    total_act = sum(a["v"] for a in acts) or 1.0
-    act_bcg = []
-    for a in acts:
-        share_a = a["v"] / total_act * 100
-        # growth proxy: use SBU growth for all activities (no per-activity history)
-        if growth is not None and growth > 0 and share_a >= 50:
-            q = "Star"
-        elif (growth is None or growth <= 0) and share_a >= 50:
-            q = "Cash Cow"
-        elif growth is not None and growth > 0 and share_a < 50:
-            q = "Question Mark"
-        else:
-            q = "Dog"
-        act_bcg.append(f"{a['k']} — {cr(a['v'])} Cr ({share_a:.0f}%) → {q}")
+    def _blk(heading, items):
+        return {"heading": heading, "items": [str(i) for i in items if i]}
 
-    # SWOT
+    def _tbl(heading, headers, rows):
+        return {"heading": heading, "table": {"headers": [str(h) for h in headers],
+                                              "rows": [[str(c) for c in r] for r in rows]}}
+
+    # ---- derived ----
+    under = [x for x in mon if x["gap"] is not None and x["gap"] < 0]
+    over = [x for x in mon if x["gap"] is not None and x["gap"] >= 0]
+    total_gap = sum(x["gap"] for x in mon if x["gap"] is not None)
+    ach_vals = [x["ach"] for x in mon if x["ach"] is not None]
+    avg_ach = (sum(ach_vals) / len(ach_vals)) if ach_vals else None
+    total_act = sum(a["v"] for a in acts) or 1.0
+    fy31 = proj.get("FY31", 0)
+    cagr = d["cagr"]
+
+    # ---- SWOT ----
     S, W, O, T = [], [], [], []
     if growth is not None and growth > 0: S.append(f"Revenue growing {gs()} YoY")
-    if share >= 3: S.append(f"{share}% group portfolio share — material contributor")
-    if ach is not None and ach >= 90: S.append(f"On/above target ({ach}% achievement)")
-    if ach is not None and ach < 90: W.append(f"Below paced target ({ach}% achievement)")
-    if risk == "High": W.append("Classified high risk (ach < 70% of paced target)")
+    if share >= 3: S.append(f"{share}% group portfolio share — a material revenue contributor")
+    if ach is not None and ach >= 90: S.append(f"On or above target at {ach}% achievement")
+    if ach is not None and ach < 90: W.append(f"Below paced target at {ach}% achievement")
+    if risk == "High": W.append("Classified high risk (achievement < 70% of paced target)")
     if growth is not None and growth < 0: W.append(f"Revenue contracting {gs()} YoY")
-    neg = sum(1 for x in mon if x["gap"] is not None and x["gap"] < 0)
-    if neg: W.append(f"{neg} of last {len(mon)} months under target")
-    O.append(f"5-year trajectory to {cr(proj['FY31'])} Cr at {d['cagr']:.0f}% CAGR")
-    O.append("Close monthly gap through the action plans below")
-    T.append(f"Target gap risk — current classification: {risk}")
-    T.append("Macro headwinds: inflation 8–9%+, FX 122.75 (import-cost pressure)")
+    if under: W.append(f"{len(under)} of last {len(mon)} months under target")
+    O.append(f"5-year trajectory to {cr(fy31)} Cr at {cagr:.0f}% CAGR")
+    O.append("Close monthly gaps through execution of the action plans below")
+    O.append("Scale the highest-revenue activity stream(s)")
+    T.append(f"Target-gap risk — current classification {risk}")
+    T.append("Macro headwinds: inflation 8–9%+, USD/BDT 122.75 (import-cost pressure)")
+    if growth is not None and growth < 0: T.append("Structural revenue decline if not reversed")
+
+    # ---- activity BCG ----
+    act_bcg_rows = []
+    for a in acts:
+        sa = a["v"] / total_act * 100
+        if growth is not None and growth > 0 and sa >= 50: q = "Star"
+        elif (growth is None or growth <= 0) and sa >= 50: q = "Cash Cow"
+        elif growth is not None and growth > 0 and sa < 50: q = "Question Mark"
+        else: q = "Dog"
+        act_bcg_rows.append([a["k"], f"{cr(a['v'])} Cr", f"{sa:.0f}%", q])
 
     tabs = [
-        {"id": "dashboard", "title": "Dashboard", "blocks": [
-            _blk("Key Metrics", [f"MTD {cr(mtd)} Cr · YTD {cr(ytd)} Cr",
-                                 f"Monthly target {cr(mtgt)} Cr · Achievement {ach if ach is not None else '—'}%",
-                                 f"Portfolio share {share}% · YoY growth {gs()}",
-                                 f"BCG quadrant: {quad}"]),
-            _blk("5-Year Projection (STRATEGIC PROJECTION)", [f"FY27 {cr(proj['FY27'])} → FY31 {cr(proj['FY31'])} Cr (CAGR {d['cagr']:.0f}%)"]),
-        ]},
-        {"id": "qsa", "title": "QSA", "blocks": [
-            _blk("Quick Situation Analysis", [
-                f"Current stage: {'high-risk / turnaround' if risk == 'High' else 'growing' if (growth or 0) > 0 else 'stable'}",
-                f"Footprint: {share}% of group revenue",
-                f"Revenue streams: {', '.join(a['k'] for a in acts[:4])}",
-                f"Latest achievement: {ach if ach is not None else '—'}% of paced target",
-                "Blocks: " + ("monthly target gaps & high-risk classification" if neg or risk == "High" else "none material")]),
-        ]},
-        {"id": "swot", "title": "SWOT+TOWS", "blocks": [
-            _blk("Strengths", S or ["Data gap — see strategy document"]),
-            _blk("Weaknesses", W or ["None derived from DWH"]),
-            _blk("Opportunities", O),
-            _blk("Threats", T),
-            _blk("TOWS Strategies", [
-                "SO — scale growth streams and expand portfolio share",
-                "WO — execute gap-closing actions to lift achievement",
-                "ST — hedge macro/FX exposure on import-dependent lines",
-                "WT — de-risk high-risk revenue lines via recovery plans"]),
-        ]},
-        {"id": "marketing", "title": "Marketing Led", "blocks": [
-            _blk("Marketing-led view", [
-                "Marketing spend is tracked at group level (GL 4210001) — see Marketing Campaign Command Center",
-                f"Revenue base {cr(base)} Cr/yr — growth to {cr(proj['FY31'])} Cr requires sustained demand",
-                "Action: align campaign/activation roadmap to close target gap",
-                "ROMI tracking: data gap — see campaign command center"]),
-        ]},
-        {"id": "pestel", "title": "PESTEL", "blocks": [
-            _blk("Macro context (FY 2026-27 National Budget)", [
-                "Political: BNP government, 'Trillion Dollar March' theme",
-                "Economic: inflation 8–9%+, budget ৳9.38L Cr (+17.7%)",
-                "Social: consumer demand shifts tracked via SBU sales",
-                "Technological: DWH/MCP-driven performance monitoring",
-                "Environmental: sustainability/compliance per SBU",
-                "Legal: import/NOC/LC approval loops are recurring blockers"]),
-        ]},
-        {"id": "porter", "title": "Porter's 5", "blocks": [
-            _blk("Five Forces", [
-                "Supplier power: import-dependent lines exposed to FX & LC delays",
-                "Buyer power: B2B/G2G concentration where applicable",
-                "New entrants: low where capacity/capex is a barrier",
-                "Substitutes: commodity/price sensitivity",
-                "Rivalry: portfolio position " + quad]),
-        ]},
-        {"id": "cpm", "title": "CPM", "blocks": [
-            _blk("Competitive Profile Matrix", [
-                "Critical success factors + competitor scores live in the SBU strategy document",
-                f"SBU relative position: {share}% share, {gs()} growth",
-                "Data gap — competitor names/scores require the strategy doc"]),
-        ]},
-        {"id": "bcg", "title": "Product BCG", "blocks": [
-            _blk("Activity/Portfolio BCG (revenue streams)", act_bcg or ["No activity data"]),
-        ]},
-        {"id": "sja", "title": "SJA+SOAR", "blocks": [
-            _blk("Strategic Juncture Analysis", [
-                f"Quadrant {quad} — {'act to scale' if quad in ('Star', 'Question Mark') else 'defend & harvest' if quad == 'Cash Cow' else 'turnaround/exit'}",
-                "Opportunity window: FY27 foundation → FY31 leadership"]),
-            _blk("SOAR", [
-                "Strengths → build on growth/share",
-                "Opportunities → capture 5-year trajectory",
-                "Aspirations → close gap to target",
-                "Results → measurable via monthly gap table"]),
-        ]},
-        {"id": "vrio", "title": "VRIO", "blocks": [
-            _blk("Resource & Capability", [
-                "Data/DWH access (Valuable, Organized)",
-                "SBU-specific resources: data gap — see strategy doc",
-                "Prioritize underleveraged competitive advantages from the doc"]),
-        ]},
-        {"id": "cvp", "title": "CVP+BMC", "blocks": [
-            _blk("Customer Value Proposition", [
-                f"Segments: {', '.join(a['k'] for a in acts[:3])} revenue streams",
-                "Value: reliable supply + competitive pricing + service"]),
-            _blk("Business Model Canvas", [
-                "Key activities: sales, sourcing, delivery",
-                "Revenue streams: " + ", ".join(a["k"] for a in acts[:4]),
-                "Cost structure: COGS + import/FX + operating",
-                "Partners/channels: data gap — see strategy doc"]),
-        ]},
-        {"id": "contradictions", "title": "Contradictions", "blocks": [
-            _blk("Internal Contradictions", [
-                f"Growth ambition vs achievement gap ({ach if ach is not None else '—'}% vs 100% target)",
-                f"Target {cr(mtgt)} Cr/mo vs actual {cr(mtd)} Cr MTD",
-                "Import growth vs FX/LC constraints (where import-dependent)",
-                "Strategy vs execution capability — resolved via action plans"]),
-        ]},
-        {"id": "gap", "title": "FY25-26 GAP", "blocks": [
-            _blk("Target vs Achievement Gap (last months)", [
-                f"{x['m']}: target {cr(x['t'])} vs actual {cr(x['a'])} → gap {('+' if (x['gap'] or 0) >= 0 else '') + str(cr(x['gap'] or 0))} Cr ({x['ach'] if x['ach'] is not None else '—'}%)"
-                for x in mon if x["gap"] is not None]),
-            _blk("Root cause", ["Monthly gap analysis above; deep root-cause in revenue-review minutes"]),
-        ]},
-        {"id": "bplan", "title": "Business Plan", "blocks": [
-            _blk("Next-Year Operating Plan", [
-                f"FY27 revenue base: {cr(base)} Cr (annualized target)",
-                f"5-year: FY31 {cr(proj['FY31'])} Cr",
-                "Priorities: close monthly gap, scale growth streams, de-risk high-risk lines"]),
-        ]},
-        {"id": "bsc", "title": "BSC+GAP", "blocks": [
-            _blk("Balanced Scorecard", [
-                f"Financial — revenue FY31 {cr(proj['FY31'])} Cr (gap from {cr(base)} Cr)",
-                f"Customer — portfolio share {share}%",
-                "Internal process — monthly gap closure",
-                "Learning & growth — data-driven performance culture"]),
-        ]},
-        {"id": "fiveplan", "title": "5-Year Plan", "blocks": [
-            _blk("Phased Roadmap", [
-                "FY27 Foundation · FY28 Expansion · FY29 Acceleration · FY30 Scale-Up · FY31 Leadership",
-                f"Revenue: {cr(proj['FY27'])} → {cr(proj['FY31'])} Cr",
-                "Capability: digital/people/footprint per strategy doc"]),
-        ]},
-        {"id": "wayforward", "title": "Way Forward", "blocks": [
-            _blk("Prioritised Actions (next 90 days)", [f"{a['what']} — {a['owner']}" for a in actions]),
-        ]},
-        {"id": "execution", "title": "Execution Plan", "blocks": [
-            _blk("Initiatives", [f"{a['what']} · Owner: {a['owner']} · KPI: target achievement · Timeline: next 90 days" for a in actions]),
-        ]},
-        {"id": "risk", "title": "Risk & Mitigation", "blocks": [
-            _blk("Risk Register", [
-                f"Target gap ({risk}) — mitigation: recovery actions + monthly review",
-                "FX/import cost — mitigation: hedge + landed-cost watch",
-                "LC/NOC approval delays — mitigation: escalate to MD/CXO"]),
-        ]},
-        {"id": "playbook", "title": "Playbook", "blocks": [
-            _blk("Strategic Playbook", [
-                "Governance/Control: monthly performance review",
-                "Defence: risk & stability (FX, LC, working capital)",
-                "Midfield: people, process & technology (DWH/MCP)",
-                "Attack: growth, customer & innovation (scale growth streams)",
-                f"5-year goal: {cr(proj['FY31'])} Cr by FY31"]),
-        ]},
+      {"id": "dashboard", "title": "Dashboard", "blocks": [
+        _tbl("Key Performance Snapshot", ["Metric", "Value"],
+             [["MTD Revenue (net)", f"{cr(mtd)} Cr"],
+              ["YTD Revenue (net)", f"{cr(ytd)} Cr"],
+              ["Monthly Target", f"{cr(mtgt)} Cr"],
+              ["Achievement (vs paced)", f"{ach if ach is not None else '—'}%"],
+              ["Portfolio Share", f"{share}%"],
+              ["YoY Growth", gs()],
+              ["BCG Quadrant", quad]]),
+        _tbl("5-Year Revenue Projection (STRATEGIC PROJECTION)", ["Year", "Revenue (Cr)"],
+             [[f"FY{yr}", cr(proj[f"FY{yr}"])] for yr in range(27, 32)] + [["CAGR", f"{cagr:.0f}%"]]),
+        _blk("Projection basis", [f"Base year FY27 = {cr(base)} Cr (annualized monthly target / YTD run-rate).",
+                                  f"Applied a flat {cagr:.0f}% YoY growth assumption — a strategic projection, not an approved target."]),
+      ]},
+      {"id": "qsa", "title": "QSA", "blocks": [
+        _blk("Quick Situation Analysis", [
+            f"Business stage: {'high-risk / turnaround' if risk == 'High' else ('growing' if (growth or 0) > 0 else 'stable')}",
+            f"Group footprint: {share}% of total group revenue",
+            f"Revenue streams: {', '.join(a['k'] for a in acts[:4]) or '—'}",
+            f"Latest achievement: {ach if ach is not None else '—'}% of paced target",
+            f"Average achievement (last {len(mon)} months): {('%.1f%%' % avg_ach) if avg_ach is not None else '—'}"]),
+        _blk("Strengths", S or ["None derived from DWH — see strategy document"]),
+        _blk("Weaknesses / Blocks", W or ["None derived from DWH"]),
+        _blk("Future Opportunity", O),
+      ]},
+      {"id": "swot", "title": "SWOT+TOWS", "blocks": [
+        _blk("Strengths", S or ["Data gap — see strategy document"]),
+        _blk("Weaknesses", W or ["None derived from DWH"]),
+        _blk("Opportunities", O),
+        _blk("Threats", T),
+        _blk("TOWS Strategies (derived from the SWOT)", [
+            "SO — leverage growth + share to scale the leading revenue stream",
+            "WO — execute gap-closing actions to lift achievement above 90%",
+            "ST — hedge FX/import exposure on import-dependent lines",
+            "WT — run recovery plans on high-risk revenue lines to avoid further decline"]),
+      ]},
+      {"id": "marketing", "title": "Marketing Led", "blocks": [
+        _blk("Market Position & Gaps", [
+            f"Current position: {share}% group share, {gs()} growth",
+            "Marketing gap: spend is tracked at group level (GL 4210001) — SBU-level budget requires the campaign command center",
+            "Brand/customer gap: data gap — see strategy document",
+            "Channel gap: data gap — see route-to-market / sales analysis"]),
+        _blk("Marketing-led Revenue Opportunity", [
+            f"Revenue base {cr(base)} Cr → FY31 {cr(fy31)} Cr implies sustained demand generation",
+            "5-year drivers: brand growth, channel expansion, campaign ROI (ROMI)",
+            "Roadmap: align campaign/activation calendar to close the monthly target gap",
+            "ROMI: data gap — see Marketing Campaign Command Center"]),
+      ]},
+      {"id": "pestel", "title": "PESTEL", "blocks": [
+        _blk("Political", ["BNP government; 'Trillion Dollar March' growth theme",
+                           "Import/NOC/LC approval loops are recurring operational blockers"]),
+        _blk("Economic", ["FY26-27 budget ৳9.38L Cr (+17.7%); ADP ৳3.00L Cr (+30.4%)",
+                          "Inflation 8–9%+ (16-month high) — pricing & margin pressure",
+                          "FX USD/BDT 122.75 — import cost + landed-cost risk"]),
+        _blk("Social", ["Consumer demand shifts tracked via monthly SBU sales data",
+                        "Demographic growth supports long-run volume"]),
+        _blk("Technological", ["DWH/MCP-driven real-time performance monitoring",
+                               "AI-assisted strategic reporting (this control tower)"]),
+        _blk("Environmental", ["Sustainability/compliance requirements per SBU (data gap)"]),
+        _blk("Legal", ["NOC approval (e.g. Nobayon), LC approval, and rate-approval friction",
+                       "Government subsidy schemes where applicable"]),
+      ]},
+      {"id": "porter", "title": "Porter's 5", "blocks": [
+        _blk("Supplier Power", ["Import-dependent lines exposed to FX and LC delays (elevated supplier power)",
+                                "Local sourcing where margin is thin (see revenue review minutes)"]),
+        _blk("Buyer Power", ["B2B/G2G concentration raises buyer power in wholesale lines",
+                             "Consumer lines: brand + distribution lowers buyer power"]),
+        _blk("Threat of New Entrants", ["Moderate — capital/capex and distribution are entry barriers"]),
+        _blk("Threat of Substitutes", ["Commodity/price sensitivity — substitute risk in undifferentiated lines"]),
+        _blk("Competitive Rivalry", [f"Portfolio position: {quad} ({share}% share, {gs()} growth)"]),
+      ]},
+      {"id": "cpm", "title": "CPM", "blocks": [
+        _blk("Competitive Profile Matrix", [
+            "Critical Success Factors, weights and competitor scores live in the SBU strategy document (data gap).",
+            "The framework compares: cost, quality, distribution, brand, and customer relationships."]),
+        _tbl("SBU Relative Position (DWH-derived)", ["Dimension", "Value"],
+             [["Portfolio share", f"{share}%"],
+              ["YoY growth", gs()],
+              ["Achievement vs target", f"{ach if ach is not None else '—'}%"],
+              ["BCG quadrant", quad]]),
+        _blk("Note", ["Weights must sum to 1.00; competitor names/scores are sourced from the strategy doc, never copied from other SBUs."]),
+      ]},
+      {"id": "bcg", "title": "Product BCG", "blocks": [
+        _tbl("Activity / Revenue-stream BCG (growth vs share proxy)", ["Activity", "Revenue", "Share", "Quadrant"],
+             act_bcg_rows),
+        _blk("Portfolio logic", [
+            "Star = high growth + high share → invest",
+            "Cash Cow = low growth + high share → harvest & fund growth",
+            "Question Mark = high growth + low share → selective investment",
+            "Dog = low growth + low share → turnaround or exit"]),
+      ]},
+      {"id": "sja", "title": "SJA+SOAR", "blocks": [
+        _blk("Strategic Juncture Analysis", [
+            f"Quadrant: {quad} — {'scale aggressively' if quad in ('Star', 'Question Mark') else ('defend & harvest' if quad == 'Cash Cow' else 'turnaround/exit')}",
+            "Opportunity window: FY27 foundation → FY31 leadership (5-year runway)",
+            "Bold risk: failing to close the monthly target gap erodes the 5-year trajectory"]),
+        _blk("SOAR", [
+            f"Strengths → {', '.join(S[:2]) if S else 'build on current position'}",
+            f"Opportunities → capture FY31 {cr(fy31)} Cr ambition",
+            f"Aspirations → sustain {cagr:.0f}% CAGR and close gaps",
+            f"Results → measured via the monthly gap table (target vs actual)"]),
+      ]},
+      {"id": "vrio", "title": "VRIO", "blocks": [
+        _blk("Resource & Capability Assessment", [
+            "Data/DWH access — Valuable + Organized (competitive parity)",
+            "SBU-specific resources/capabilities — data gap, see strategy document",
+            "Prioritize underleveraged competitive advantages identified in the doc"]),
+        _tbl("VRIO framework", ["Resource", "V", "R", "I", "O", "Implication"],
+             [["DWH/MCP performance data", "Y", "N", "N", "Y", "Parity"],
+              ["SBU-specific assets", "?", "?", "?", "?", "Data gap"]]),
+      ]},
+      {"id": "cvp", "title": "CVP+BMC", "blocks": [
+        _blk("Customer Value Proposition", [
+            f"Segments: {', '.join(a['k'] for a in acts[:3]) or '—'}",
+            "Customer jobs/needs: reliable supply, competitive pricing, consistent quality",
+            "SBU solution: on-time delivery + service via existing network",
+            "Customer benefit: lower risk / better value",
+            "Company benefit: recurring revenue + margin"]),
+        _blk("Business Model Canvas", [
+            "Key partners: suppliers, distributors, logistics (data gap for specifics)",
+            "Key activities: sourcing, sales, delivery, collections",
+            "Key resources: people, working capital, DWH/data",
+            "Value proposition: reliable supply + competitive pricing",
+            "Customer relationships: account management (B2B) / brand (B2C)",
+            "Channels: direct + dealer/distributor network",
+            f"Customer segments: {', '.join(a['k'] for a in acts[:3]) or '—'}",
+            "Cost structure: COGS + import/FX + operating + financing",
+            f"Revenue streams: {', '.join(a['k'] for a in acts[:4]) or '—'}"]),
+      ]},
+      {"id": "contradictions", "title": "Contradictions", "blocks": [
+        _blk("Internal Contradictions / Barriers", [
+            f"Growth ambition (FY31 {cr(fy31)} Cr) vs current achievement ({ach if ach is not None else '—'}%)",
+            f"Monthly target {cr(mtgt)} Cr vs MTD actual {cr(mtd)} Cr",
+            "Import-driven growth vs FX/LC/NOC constraints",
+            "Strategy vs execution capability — bridged via the action plan",
+            "Portfolio share ambition vs working-capital constraints (where applicable)"]),
+        _blk("Benchmark", ["Compare against the group BCG matrix to validate the contradiction is not systemic"]),
+      ]},
+      {"id": "gap", "title": "FY25-26 GAP", "blocks": [
+        _tbl("Monthly Target vs Achievement Gap", ["Month", "Target (Cr)", "Actual (Cr)", "Gap (Cr)", "Ach %"],
+             [[x["m"], cr(x["t"]), cr(x["a"]), (("+" if x["gap"] >= 0 else "") + str(cr(x["gap"]))), (x["ach"] if x["ach"] is not None else "—")]
+              for x in mon if x["gap"] is not None]),
+        _blk("Gap Summary", [
+            f"Months under target: {len(under)} · Months on/above: {len(over)}",
+            f"Cumulative gap: {'+' if total_gap >= 0 else ''}{cr(total_gap)} Cr",
+            f"Average achievement: {('%.1f%%' % avg_ach) if avg_ach is not None else '—'}"]),
+        _blk("Root Cause & Corrective Action", [
+            "Root cause: recorded in revenue-review minutes (import/NOC/LC, demand, or execution).",
+            "Corrective action: gap-closing initiatives in the Way Forward / Execution Plan."]),
+      ]},
+      {"id": "bplan", "title": "Business Plan", "blocks": [
+        _blk("Next-Year Operating Plan (FY27)", [
+            f"Revenue target (annualized): {cr(base)} Cr",
+            f"5-year ambition: FY31 {cr(fy31)} Cr",
+            "Volume/units, margin, channel and footprint detail: data gap — see strategy document",
+            "Strategic priorities: close monthly gap · scale growth streams · de-risk high-risk lines",
+            "Key commercial actions: per the Way Forward / Execution Plan below"]),
+      ]},
+      {"id": "bsc", "title": "BSC+GAP", "blocks": [
+        _tbl("Balanced Scorecard", ["Perspective", "KPI", "Latest", "FY31 Target", "Gap"],
+             [["Financial", "Revenue (Cr)", cr(ytd), cr(fy31), cr(fy31 - (ytd or 0))],
+              ["Customer", "Portfolio share %", share, "≥ group average", "—"],
+              ["Internal", "Achievement %", (ach if ach is not None else "—"), "≥ 90%", ("—" if ach is None else cr(90 - ach))],
+              ["Learning & Growth", "Data-driven decisions", "Active", "Mature", "—"]]),
+      ]},
+      {"id": "fiveplan", "title": "5-Year Plan", "blocks": [
+        _tbl("Phased Roadmap", ["Phase", "Year", "Revenue (Cr)", "Focus"],
+             [["Foundation", "FY27", cr(proj["FY27"]), "Stabilise & close gaps"],
+              ["Expansion", "FY28", cr(proj["FY28"]), "Scale growth streams"],
+              ["Acceleration", "FY29", cr(proj["FY29"]), "Deepen market position"],
+              ["Scale-Up", "FY30", cr(proj["FY30"]), "Scale footprint & capability"],
+              ["Leadership", "FY31", cr(proj["FY31"]), "Category/segment leadership"]]),
+        _blk("Capability progression", ["Digital, people and footprint milestones per strategy document (data gap)"]),
+      ]},
+      {"id": "wayforward", "title": "Way Forward", "blocks": [
+        _blk("Prioritised Recommendations (next 90 days)", [
+            f"{a['what']} — Owner: {a['owner']} — Timeline: next 90 days — Output: measurable target lift"
+            for a in actions]),
+        _blk("Priority", ["Critical: urgent LC/NOC/rate-approval escalations · High: gap-closing · Medium: capability · Lower: long-term"]),
+      ]},
+      {"id": "execution", "title": "Execution Plan", "blocks": [
+        _tbl("Initiatives", ["Initiative", "Owner", "KPI", "Timeline"],
+             [[a["what"], a["owner"], "target achievement", "next 90 days"] for a in actions]),
+        _blk("Reconciliation", ["Initiatives reconcile with Business Plan, BSC, 5-Year Plan and Risk Register."]),
+      ]},
+      {"id": "risk", "title": "Risk & Mitigation", "blocks": [
+        _tbl("Risk Register", ["Risk", "Severity", "Likelihood", "Mitigation", "Owner"],
+             [[f"Target gap ({risk})", "High" if risk == "High" else "Med", "High" if under else "Med", "Recovery actions + monthly review", "SBU Head"],
+              ["FX / import cost", "Med", "Med", "Hedge + landed-cost watch", "Finance"],
+              ["LC / NOC approval delay", "High", "Med", "Escalate to MD/CXO", "Procurement + CXOs"],
+              ["Demand / market decline", "Med", "Med", "Marketing-led demand + channel expansion", "Marketing"]]),
+      ]},
+      {"id": "playbook", "title": "Playbook", "blocks": [
+        _blk("Strategic Playbook (football formation)", [
+            "Governance/Control — monthly performance review & escalation",
+            "Defence — risk & stability (FX, LC, working capital)",
+            "Midfield — people, process & technology (DWH/MCP, automation)",
+            "Attack — growth, customer & innovation (scale growth streams)",
+            f"5-year goal: {cr(fy31)} Cr by FY31",
+            "Substitutions/contingency: recovery plans + portfolio reallocation per BCG quadrant"]),
+      ]},
     ]
     return tabs
 
