@@ -915,7 +915,7 @@ function renderSbu5Y(code){
   html += '<div class="grid c2">'+
     '<div><div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;">BCG Quadrant</div>'+
       '<span class="pill '+qc[s.quadrant]+'" style="font-size:14px;padding:6px 14px;">'+esc(s.quadrant)+'</span>'+
-      '<div class="note" style="margin-top:6px;">Growth '+(s.growth===null?'—':(s.growth>=0?'+':'')+fmt(s.growth,1)+'%) · Share '+fmt(s.share,2)+'%</div></div>'+
+      '<div class="note" style="margin-top:6px;">Growth '+(s.growth===null?'—':(s.growth>=0?'+':'')+fmt(s.growth,1)+'%')+' · Share '+fmt(s.share,2)+'%</div></div>'+
     '<div><div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;">5-Year Projection (STRATEGIC PROJECTION)</div>'+
       '<div class="srh"><table><thead><tr><th class="num">FY27</th><th class="num">FY28</th><th class="num">FY29</th><th class="num">FY30</th><th class="num">FY31</th></tr></thead><tbody><tr>'+
       yrs.map(function(y){return '<td class="num">'+fmt(proj[y])+'</td>';}).join('')+'</tr></tbody></table></div></div>'+
