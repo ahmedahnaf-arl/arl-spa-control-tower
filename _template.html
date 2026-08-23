@@ -159,6 +159,14 @@
   .vrow{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:6px 0;border-bottom:1px solid rgba(36,48,65,.45)}
   .vrow:last-child{border-bottom:none}
   .vrow .k{color:var(--muted)}
+
+  /* 20-tab sub-navigation */
+  .st20{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 4px;border-bottom:1px solid var(--border);padding-bottom:8px}
+  .st20btn{background:var(--panel2);border:1px solid var(--border);color:var(--muted);padding:5px 9px;font-size:11px;font-weight:600;cursor:pointer;border-radius:6px;font-family:inherit;letter-spacing:.2px}
+  .st20btn:hover{color:var(--txt)}
+  .st20btn.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .proj{display:flex;flex-wrap:wrap;gap:5px}
+  .proj span{font-size:10.5px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:2px 8px;color:var(--txt)}
 </style>
 </head>
 <body>
@@ -947,12 +955,39 @@ function renderSbu5Y(code){
   } else {
     html += '<div class="note" style="margin-top:10px;color:var(--amber);"><b>Strategy document:</b> In progress — not yet uploaded to the 5-Year Strategy drive.</div>';
   }
-  html += '<div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;">20-Tab Strategy Framework (ACCL structure)</div>';
-  html += '<div class="proj">';
-  for(var t=0;t<tabs.length;t++){ html += '<span>'+esc(tabs[t])+'</span>'; }
+  window._sbu20 = s.tabs20 || [];
+  html += '<div class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;">20-Tab Strategy Narrative</div>';
+  html += '<div class="st20" id="st20bar">';
+  for(var t=0;t<window._sbu20.length;t++){
+    html += '<button class="st20btn'+(t===0?' on':'')+'" data-t20="'+esc(window._sbu20[t].id)+'" onclick="switchSubTab20(\''+esc(window._sbu20[t].id)+'\')">'+esc(window._sbu20[t].title)+'</button>';
+  }
   html += '</div>';
+  html += '<div id="st20content"></div>';
   html += '</div>';
   document.getElementById('sbu5y-detail').innerHTML = html;
+  switchSubTab20(window._sbu20.length ? window._sbu20[0].id : null);
+}
+
+function switchSubTab20(id){
+  var bar = document.getElementById('st20bar');
+  if(bar){
+    var btns = bar.querySelectorAll('.st20btn');
+    for(var i=0;i<btns.length;i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-t20')===id);
+  }
+  var c = document.getElementById('st20content');
+  if(!c) return;
+  var tab = null;
+  for(var i=0;i<(window._sbu20||[]).length;i++){ if(window._sbu20[i].id===id) tab=window._sbu20[i]; }
+  if(!tab) return;
+  var html='';
+  for(var b=0;b<tab.blocks.length;b++){
+    var blk = tab.blocks[b];
+    html += '<div style="margin:10px 0;"><div class="mut" style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">'+esc(blk.heading)+'</div>'+
+      '<ul style="margin:4px 0 0 16px;font-size:12px;">';
+    for(var n=0;n<blk.items.length;n++){ html += '<li style="margin:2px 0;">'+esc(blk.items[n])+'</li>'; }
+    html += '</ul></div>';
+  }
+  c.innerHTML = html;
 }
 
 /* ============ CHARTS ============ */
