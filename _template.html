@@ -1034,8 +1034,9 @@ function drawSbuChart(id){
   } else if(id==='bcg'){
     var acts=s.activities||[];
     var palette=['#4a8fd4','#34d399','#fbbf24','#f87171','#a78bfa','#22d3ee'];
-    cfg={type:'doughnut', data:{labels:acts.map(function(x){return x.k;}), datasets:[{data:acts.map(function(x){return x.v;}), backgroundColor:palette.slice(0,Math.max(acts.length,1)), borderWidth:0}]},
-      options:{responsive:true, maintainAspectRatio:false, cutout:'55%', plugins:{legend:{position:'right', labels:{color:'#c9d3df', boxWidth:12, font:{size:11}}}}};
+    var bcgOpts={responsive:true, maintainAspectRatio:false, cutout:'55%'};
+    bcgOpts.plugins={legend:{position:'right', labels:{color:'#c9d3df', boxWidth:12, font:{size:11}}}};
+    cfg={type:'doughnut', data:{labels:acts.map(function(x){return x.k;}), datasets:[{data:acts.map(function(x){return x.v;}), backgroundColor:palette.slice(0,Math.max(acts.length,1)), borderWidth:0}]}, options:bcgOpts};
   }
   if(cfg){ try{ window._sbuChart = new Chart(ctx, cfg); }catch(e){} }
 }
