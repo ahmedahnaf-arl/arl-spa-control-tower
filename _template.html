@@ -363,6 +363,8 @@ function switchTab(name){
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on', tabs[i].getAttribute('data-tab')===name);
   var panes=document.querySelectorAll('.tab-pane');
   for(var j=0;j<panes.length;j++) panes[j].classList.toggle('active', panes[j].id==='tab-'+name);
+  if(name==='strategy5y' && T.five_year && T.five_year.length) drawBcgScatter(T.five_year);
+  if(name==='revenue') drawTrend();
 }
 
 /* ============ EXECUTIVE PROFILE + USER CHIP ============ */
@@ -870,15 +872,20 @@ function renderReports(){
 function renderStrategy5Y(){
   var fy = T.five_year || [];
   var html='';
-  html += '<div class="kpis">'+
-    '<div class="kpi"><div class="l">SBUs</div><div class="n">'+fy.length+'</div><div class="u">strategy coverage</div></div>'+
-    '<div class="kpi g"><div class="l">Documented</div><div class="n">'+fy.filter(function(s){return s.status==='Documented';}).length+'</div><div class="u">with strategy docs</div></div>'+
-    '<div class="kpi a"><div class="l">In Progress</div><div class="n">'+fy.filter(function(s){return s.status==='In progress';}).length+'</div><div class="u">awaiting strategy</div></div>'+
-    '<div class="kpi"><div class="l">Horizon</div><div class="n">FY27-31</div><div class="u">5-year window</div></div>'+
-    '</div>';
+  // SBU portal (top)
+  html += '<div class="sec"><h2 class="sec-title">5-Year SBU Strategy Portal — FY 2026-27 → FY 2030-31</h2>'+
+    '<div class="card" style="border-left:3px solid var(--blue);"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'+
+    '<span class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Select SBU</span>'+
+    '<select id="sbu5y" onchange="renderSbu5Y(this.value)" style="flex:1;min-width:240px;background:#161d27;color:#e6ebf2;border:1px solid #243041;border-radius:6px;padding:10px 12px;font-size:14px;font-weight:600;font-family:inherit;">'+
+    fy.map(function(s){return '<option value="'+esc(s.code)+'">'+esc(s.code)+'</option>';}).join('')+
+    '</select></div>'+
+    '<div id="sbu5y-detail"></div></div></div>';
+  // Group BCG scatter + quadrant cards
   var quads = {Star:[], 'Cash Cow':[], 'Question Mark':[], 'Dog':[]};
   for(var i=0;i<fy.length;i++){ if(quads[fy[i].quadrant]) quads[fy[i].quadrant].push(fy[i].code); }
-  html += '<div class="sec"><h2 class="sec-title">SBU Portfolio — BCG Matrix</h2><div class="grid c4">';
+  html += '<div class="sec"><h2 class="sec-title">SBU Portfolio — BCG Matrix</h2>'+
+    '<div class="card"><div class="chartbox" style="height:360px;"><canvas id="bcgScatter"></canvas></div></div>'+
+    '<div class="grid c4" style="margin-top:14px;">';
   var qlabels = [['Star','g','High growth · High share'],['Question Mark','a','High growth · Low share'],['Cash Cow','g','Low growth · High share'],['Dog','r','Low growth · Low share']];
   for(var qi=0;qi<qlabels.length;qi++){
     var qn = qlabels[qi][0], qc2 = qlabels[qi][1], qd = qlabels[qi][2];
@@ -889,14 +896,15 @@ function renderStrategy5Y(){
       '<div class="proj" style="margin-top:8px;">'+quads[qn].map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div></div>';
   }
   html += '</div></div>';
-  html += '<div class="sec"><h2 class="sec-title">5-Year SBU Strategy — FY 2026-27 → FY 2030-31 (ACCL framework)</h2>'+
-    '<div class="card"><div style="margin-bottom:10px;"><span class="mut" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Select SBU</span></div>'+
-    '<select id="sbu5y" onchange="renderSbu5Y(this.value)" style="width:100%;max-width:340px;background:#161d27;color:#e6ebf2;border:1px solid #243041;border-radius:6px;padding:9px 12px;font-size:13px;font-family:inherit;">'+
-    fy.map(function(s){return '<option value="'+esc(s.code)+'">'+esc(s.code)+'</option>';}).join('')+
-    '</select></div>'+
-    '<div id="sbu5y-detail"></div></div>';
+  html += '<div class="kpis">'+
+    '<div class="kpi"><div class="l">SBUs</div><div class="n">'+fy.length+'</div><div class="u">strategy coverage</div></div>'+
+    '<div class="kpi g"><div class="l">Documented</div><div class="n">'+fy.filter(function(s){return s.status==='Documented';}).length+'</div><div class="u">with strategy docs</div></div>'+
+    '<div class="kpi a"><div class="l">In Progress</div><div class="n">'+fy.filter(function(s){return s.status==='In progress';}).length+'</div><div class="u">awaiting strategy</div></div>'+
+    '<div class="kpi"><div class="l">Horizon</div><div class="n">FY27-31</div><div class="u">5-year window</div></div>'+
+    '</div>';
   document.getElementById('tab-strategy5y').innerHTML = html;
   renderSbu5Y(fy.length ? fy[0].code : null);
+  drawBcgScatter(fy);
 }
 
 function renderSbu5Y(code){
@@ -905,6 +913,7 @@ function renderSbu5Y(code){
   var s = null;
   for(var i=0;i<fy.length;i++){ if(fy[i].code===code) s=fy[i]; }
   if(!s) return;
+  window._sbuDetail = s;
   var proj = s.projection || {};
   var yrs = ['FY27','FY28','FY29','FY30','FY31'];
   var qc = {Star:'g', 'Cash Cow':'g', 'Question Mark':'a', 'Dog':'r'};
@@ -997,7 +1006,56 @@ function switchSubTab20(id){
     for(var n=0;n<blk.items.length;n++){ html += '<li style="margin:2px 0;">'+esc(blk.items[n])+'</li>'; }
     html += '</ul></div>';
   }
+  var chartTabs = {dashboard:1, gap:1, bcg:1, fiveplan:1};
+  if(chartTabs[id]){
+    html += '<div class="card" style="margin-top:12px;"><div class="chartbox" style="height:260px;"><canvas id="sbuChart"></canvas></div></div>';
+  }
   c.innerHTML = html;
+  if(chartTabs[id]) drawSbuChart(id);
+}
+
+/* ============ 5-YEAR STRATEGY CHARTS ============ */
+function drawSbuChart(id){
+  var s = window._sbuDetail; if(!s) return;
+  var ctx = document.getElementById('sbuChart'); if(!ctx) return;
+  if(window._sbuChart){ try{window._sbuChart.destroy();}catch(e){} }
+  var yrs=['FY27','FY28','FY29','FY30','FY31'];
+  var dark={color:'#7d8a9c'}, grid={color:'rgba(36,48,65,.5)'};
+  var cfg=null;
+  if(id==='dashboard' || id==='fiveplan'){
+    cfg={type:'bar', data:{labels:yrs, datasets:[{label:'Revenue (Cr)', data:yrs.map(function(y){return s.projection[y];}), backgroundColor:'rgba(74,143,212,.55)', borderColor:'#4a8fd4', borderWidth:1, borderRadius:3}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{grid:grid,ticks:dark}, x:{grid:{display:false},ticks:dark}}}};
+  } else if(id==='gap'){
+    var mon=s.monthly||[];
+    cfg={type:'bar', data:{labels:mon.map(function(x){return x.m;}), datasets:[
+      {label:'Target', data:mon.map(function(x){return x.t;}), backgroundColor:'rgba(74,143,212,.45)'},
+      {label:'Actual', data:mon.map(function(x){return x.a;}), backgroundColor:'rgba(52,211,153,.55)'}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#c9d3df'}}}, scales:{y:{grid:grid,ticks:dark}, x:{grid:{display:false},ticks:{color:'#7d8a9c',maxRotation:60,minRotation:45}}}}};
+  } else if(id==='bcg'){
+    var acts=s.activities||[];
+    var palette=['#4a8fd4','#34d399','#fbbf24','#f87171','#a78bfa','#22d3ee'];
+    cfg={type:'doughnut', data:{labels:acts.map(function(x){return x.k;}), datasets:[{data:acts.map(function(x){return x.v;}), backgroundColor:palette.slice(0,Math.max(acts.length,1)), borderWidth:0}]},
+      options:{responsive:true, maintainAspectRatio:false, cutout:'55%', plugins:{legend:{position:'right', labels:{color:'#c9d3df', boxWidth:12, font:{size:11}}}}};
+  }
+  if(cfg){ try{ window._sbuChart = new Chart(ctx, cfg); }catch(e){} }
+}
+
+function drawBcgScatter(fy){
+  var ctx = document.getElementById('bcgScatter'); if(!ctx) return;
+  if(window._bcgScatter){ try{window._bcgScatter.destroy();}catch(e){} }
+  var pts=[];
+  for(var i=0;i<fy.length;i++){ var s=fy[i]; if(s.growth===null) continue; pts.push({x:s.share, y:s.growth, label:s.code, quad:s.quadrant}); }
+  var colors={Star:'#34d399','Cash Cow':'#4a8fd4','Question Mark':'#fbbf24','Dog':'#f87171'};
+  window._bcgScatter = new Chart(ctx, {
+    type:'scatter',
+    data:{datasets:[{label:'SBU', data:pts, backgroundColor:pts.map(function(p){return colors[p.quad];}), pointRadius:6}]},
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(c){var p=pts[c.dataIndex]; return p.label+' — share '+p.x+'%, growth '+p.y+'%';}}}},
+      scales:{
+        x:{title:{display:true, text:'Portfolio Share %', color:'#7d8a9c'}, grid:{color:'rgba(36,48,65,.5)'}, ticks:{color:'#7d8a9c'}},
+        y:{title:{display:true, text:'YoY Growth %', color:'#7d8a9c'}, grid:{color:'rgba(36,48,65,.5)'}, ticks:{color:'#7d8a9c'}}
+      }}
+  });
 }
 
 /* ============ CHARTS ============ */
