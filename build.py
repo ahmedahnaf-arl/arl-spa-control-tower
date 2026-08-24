@@ -8,6 +8,7 @@ Revenue definition (LOCKED — arl-sbu-flash-report skill):
   (103, 116, 119, 122, 111).
 """
 import os, json, calendar, datetime
+import urllib.request
 from datetime import timedelta, date
 
 import pymssql
@@ -188,6 +189,8 @@ def main():
         "reports": reports,
         "five_year": five_year,
         "five_year_tabs": FIVE_YEAR_TABS,
+        "mcp_tools": MCP_TOOLS,
+        "mcp_intel": build_mcp_intelligence(sbus),
     }
 
     tmpl = open(os.path.join(BASE, "_template.html"), encoding="utf-8").read()
@@ -910,6 +913,123 @@ def build_20tab(d):
       ]},
     ]
     return tabs
+
+
+PMS_URL = "https://pms-mcp.vercel.app/api/mcp"
+FIN_URL = "https://akij-finance-app.vercel.app/api/mcp"
+
+MCP_TOOLS = {
+    "pms": ["list_business_units", "pms_get_sourcing", "pms_materials_to_order", "pms_draft_rfq",
+            "pms_comparative_statement", "pms_price_trigger", "pms_material_intelligence",
+            "pms_freight_intelligence", "pms_run"],
+    "ims": ["list_plants", "inventory_summary", "list_inventory_transactions", "list_gate_passes"],
+    "finance": ["list_units", "list_profit_centers", "get_income_statement", "get_balance_sheet",
+                "get_working_capital", "get_cash_flow", "get_units_summary",
+                "get_coal_lc", "get_coal_projection"],
+}
+
+
+def _mcp_post(url, method, params=None, timeout=15):
+    body = {"jsonrpc": "2.0", "id": 1, "method": method}
+    if params is not None:
+        body["params"] = params
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json",
+                                          "Accept": "application/json, text/event-stream"})
+    r = urllib.request.urlopen(req, timeout=timeout)
+    txt = r.read().decode()
+    if "data: " in txt:
+        txt = txt.split("data: ", 1)[1]
+    return json.loads(txt)
+
+
+def _mcp_tool(url, name, args, timeout=15):
+    r = _mcp_post(url, "tools/call", {"name": name, "arguments": args}, timeout)
+    content = r.get("result", {}).get("content", [])
+    if not content:
+        return None
+    txt = content[0].get("text", "")
+    try:
+        return json.loads(txt)
+    except Exception:
+        return txt
+
+
+def build_mcp_intelligence(sbus):
+    """Query PMS / IMS / Finance MCPs and combine with tower revenue for cross-MCP signals."""
+    import urllib.request
+
+    intel = {
+        "pms": {"name": "AKIJ PMS", "label": "Procurement Management", "type": "Remote MCP",
+                "endpoint": PMS_URL, "status": "Online", "units": [], "materials": {}},
+        "ims": {"name": "AKIJ IMS", "label": "Inventory & Supply Chain", "type": "Local MCP",
+                "endpoint": "DWH wms schema", "status": "Online", "inventory": []},
+        "finance": {"name": "AKIJ Finance", "label": "Financial Statements", "type": "Remote MCP",
+                    "endpoint": FIN_URL, "status": "Online", "summary": None},
+        "signals": [],
+    }
+
+    # ---- PMS ----
+    try:
+        units = _mcp_tool(PMS_URL, "list_business_units", {}, timeout=20)
+        if isinstance(units, list):
+            intel["pms"]["units"] = units
+    except Exception as e:
+        intel["pms"]["status"] = "Offline (%s)" % str(e)[:50]
+
+    for s in sbus[:8]:
+        code = s["code"]
+        try:
+            mat = _mcp_tool(PMS_URL, "pms_materials_to_order", {"business_unit_code": code}, timeout=20)
+            if isinstance(mat, list) and mat:
+                intel["pms"]["materials"][code] = mat
+        except Exception:
+            pass
+
+    # ---- IMS (DWH wms) ----
+    try:
+        rows = q("SELECT TOP 8 strSBUName, COUNT(*) AS txn_count "
+                 "FROM wms.tblInventoryTransactionHeaderArc WHERE isActive=1 "
+                 "GROUP BY strSBUName ORDER BY txn_count DESC")
+        intel["ims"]["inventory"] = [{"sbu": r["strSBUName"], "txn": r["txn_count"]} for r in rows]
+    except Exception as e:
+        intel["ims"]["status"] = "Offline (DWH %s)" % str(e)[:50]
+
+    # ---- Finance ----
+    try:
+        fin = _mcp_tool(FIN_URL, "get_units_summary", {}, timeout=25)
+        intel["finance"]["summary"] = fin
+    except Exception as e:
+        intel["finance"]["status"] = "Unreachable (%s)" % str(e)[:50]
+
+    # ---- Cross-MCP signals: procurement risk vs revenue risk ----
+    for s in sbus:
+        mat = intel["pms"]["materials"].get(s["code"], [])
+        if not mat:
+            continue
+        critical = [m for m in mat if isinstance(m, dict) and m.get("needs_order")]
+        if not critical:
+            continue
+        lowest = min(critical, key=lambda m: (m.get("days_of_supply") or 999))
+        signal = {
+            "sbu": s["code"],
+            "revenue_risk": s["risk"],
+            "ach": s["ach"],
+            "procurement_items": len(critical),
+            "critical_item": lowest.get("item_name", "—"),
+            "days_supply": lowest.get("days_of_supply"),
+            "moq": lowest.get("moq"),
+            "lead_time": lowest.get("lead_time_days"),
+            "source_country": lowest.get("source_country"),
+            "insight": ("%s revenue is %s (%.0f%% ach) but %s is critically low at %.1f days of supply "
+                        "(safety stock breach) — procurement risk could disrupt future revenue."
+                        % (s["code"], (s["risk"] or "No target").lower(),
+                           (s["ach"] or 0), lowest.get("item_name", "key material"),
+                           (lowest.get("days_of_supply") or 0))),
+        }
+        intel["signals"].append(signal)
+
+    return intel
 
 
 if __name__ == "__main__":

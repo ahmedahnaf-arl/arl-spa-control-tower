@@ -804,32 +804,72 @@ function renderVisitors(){
 /* ============ RENDER: CONNECTED SYSTEMS ============ */
 function renderSystems(){
   var sys = T.systems || [];
+  var intel = T.mcp_intel || {};
+  var tools = T.mcp_tools || {};
   var online = sys.filter(function(s){ return s.status==='Online'; }).length;
-  var remote = sys.filter(function(s){ return s.type==='Remote MCP'; }).length;
+  var toolCount = 0;
+  for(var k in tools){ toolCount += tools[k].length; }
   var html='';
   html += '<div class="kpis">'+
     '<div class="kpi"><div class="l">Connected Systems</div><div class="n">'+sys.length+'</div><div class="u">MCP data sources</div></div>'+
     '<div class="kpi g"><div class="l">Online</div><div class="n">'+online+'</div><div class="u">reachable right now</div></div>'+
-    '<div class="kpi"><div class="l">Connector Type</div><div class="n">'+remote+' remote / '+(sys.length-remote)+' local</div><div class="u">MCP servers</div></div>'+
+    '<div class="kpi"><div class="l">Tools Exposed</div><div class="n">'+toolCount+'</div><div class="u">across all MCPs</div></div>'+
+    '<div class="kpi a"><div class="l">Cross-MCP Signals</div><div class="n">'+((intel.signals||[]).length)+'</div><div class="u">procurement-risk flags</div></div>'+
     '</div>';
-  html += '<div class="sec"><h2 class="sec-title">Connected Systems — MCP Integrations</h2><div class="grid c3">';
-  for(var i=0;i<sys.length;i++){
-    var s=sys[i];
-    var stc = s.status==='Online' ? 'var(--green)' : (s.status==='Offline' ? 'var(--red)' : 'var(--amber)');
-    var pillc = s.status==='Online' ? 'g' : (s.status==='Offline' ? 'r' : 'a');
+
+  var keys = ['pms','ims','finance'];
+  html += '<div class="sec"><h2 class="sec-title">MCP Connections — Detail</h2><div class="grid c3">';
+  for(var i=0;i<keys.length;i++){
+    var k = keys[i];
+    var it = intel[k] || {};
+    var st = it.status || '—';
+    var onlineFlag = (st.indexOf('Online')===0);
+    var offFlag = (st.indexOf('Offline')===0 || st.indexOf('Unreachable')===0 || st.indexOf('Not installed')===0);
+    var stc = onlineFlag ? 'var(--green)' : (offFlag ? 'var(--red)' : 'var(--amber)');
+    var pillc = onlineFlag ? 'g' : (offFlag ? 'r' : 'a');
+    var tk = tools[k] || [];
+    var dataNote = '';
+    if(k==='pms' && it.materials){
+      var mcount = 0, mkeys = 0;
+      for(var mc in it.materials){ mcount += it.materials[mc].length; mkeys++; }
+      dataNote = '<div class="note" style="margin-top:8px;"><b>Live data:</b> '+mcount+' materials below safety across '+mkeys+' SBUs (units: '+((it.units||[]).length)+' registered)</div>';
+    } else if(k==='ims' && it.inventory && it.inventory.length){
+      dataNote = '<div class="note" style="margin-top:8px;"><b>Live data:</b> top warehouse SBU — '+esc(it.inventory[0].sbu)+' ('+it.inventory[0].txn+' txns)</div>';
+    } else if(k==='finance' && it.summary){
+      dataNote = '<div class="note" style="margin-top:8px;"><b>Live data:</b> units summary loaded</div>';
+    }
     html += '<div class="card" style="border-top:3px solid '+stc+'">'+
-      '<h3>'+esc(s.name)+'</h3>'+
+      '<h3>'+esc(it.name||k.toUpperCase())+'</h3>'+
       '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'+
-        '<span class="pill x">'+esc(s.type)+'</span>'+
-        '<span class="pill '+pillc+'">'+esc(s.status)+'</span>'+
+        '<span class="pill x">'+esc(it.type||'MCP')+'</span>'+
+        '<span class="pill '+pillc+'">'+esc(st)+'</span>'+
       '</div>'+
-      '<div class="note" style="font-weight:600;">'+esc(s.label)+'</div>'+
-      '<div class="note" style="margin-top:8px;"><b>Endpoint:</b> '+esc(s.endpoint)+'</div>'+
-      '<div class="proj" style="margin-top:10px;">'+s.tools.map(function(t){return '<span>'+esc(t)+'</span>';}).join('')+'</div>'+
+      '<div class="note" style="font-weight:600;">'+esc(it.label||'')+'</div>'+
+      '<div class="note" style="margin-top:8px;"><b>Endpoint:</b> '+esc(it.endpoint||'')+'</div>'+
+      dataNote+
+      '<div class="mut" style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;">Tools ('+tk.length+')</div>'+
+      '<div class="proj">'+tk.map(function(t){return '<span>'+esc(t)+'</span>';}).join('')+'</div>'+
       '</div>';
   }
   html += '</div></div>';
-  html += '<div class="sec"><div class="card"><h3>How these feed the tower</h3><div class="note">These MCP connectors expose procurement (PMS), inventory / supply-chain (IMS) and finance (AKIJ Finance) data to the SPA AI agents. The tower surfaces their live connection status; the agents call their tools for sourcing, RFQ, stock and financial-statement analysis during strategic reviews and gap analyses.</div></div></div>';
+
+  var sigs = intel.signals || [];
+  html += '<div class="sec"><h2 class="sec-title">Cross-MCP Intelligence — Procurement vs Revenue Risk</h2>';
+  if(sigs.length){
+    html += '<div class="srh"><table><thead><tr><th>SBU</th><th>Revenue Risk</th><th class="num">Ach %</th><th class="num">Items Below Safety</th><th>Critical Material</th><th class="num">Days Supply</th><th>Insight</th></tr></thead><tbody>';
+    for(var i=0;i<sigs.length;i++){
+      var g = sigs[i];
+      var rp = g.revenue_risk==='High'?'r':(g.revenue_risk==='Medium'?'a':'g');
+      html += '<tr><td><b>'+esc(g.sbu)+'</b></td><td><span class="pill '+rp+'">'+esc(g.revenue_risk)+'</span></td>'+
+        '<td class="num">'+pct(g.ach)+'</td><td class="num">'+g.procurement_items+'</td><td>'+esc(g.critical_item)+'</td>'+
+        '<td class="num">'+fmt(g.days_supply,1)+'</td><td style="font-size:11.5px;">'+esc(g.insight)+'</td></tr>';
+    }
+    html += '</tbody></table></div>';
+  } else {
+    html += '<div class="card"><div class="note">No cross-MCP signals available — either the procurement MCP returned no below-safety materials, or an MCP is currently unreachable (see status above).</div></div>';
+  }
+  html += '</div>';
+
   document.getElementById('tab-systems').innerHTML = html;
 }
 
